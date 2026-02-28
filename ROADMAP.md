@@ -6,8 +6,8 @@
 - repositories feature 実装
 - 実操作テストの土台作成
 
-## Phase 1: Collaboration Core
-- pull_requests feature
+## Phase 1: Collaboration Core（進行中）
+- pull_requests feature（完了）
 - issues feature
 - 目標: 日常開発で必要な操作を backend で完結
 

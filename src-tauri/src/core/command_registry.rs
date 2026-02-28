@@ -87,6 +87,47 @@ impl CommandRegistry {
             .expect("default command should register");
 
         registry
+            .register(CommandSpec::new(
+                "pr.list",
+                "gh",
+                &[
+                    "pr",
+                    "list",
+                    "--json",
+                    "number,title,state,url,isDraft,author,headRefName,baseRefName",
+                ],
+                CommandSafety::NonDestructive,
+            ))
+            .expect("default command should register");
+
+        registry
+            .register(CommandSpec::new(
+                "pr.create",
+                "gh",
+                &["pr", "create", "--json", "number,url,state"],
+                CommandSafety::NonDestructive,
+            ))
+            .expect("default command should register");
+
+        registry
+            .register(CommandSpec::new(
+                "pr.review",
+                "gh",
+                &["pr", "review"],
+                CommandSafety::NonDestructive,
+            ))
+            .expect("default command should register");
+
+        registry
+            .register(CommandSpec::new(
+                "pr.merge",
+                "gh",
+                &["pr", "merge"],
+                CommandSafety::NonDestructive,
+            ))
+            .expect("default command should register");
+
+        registry
     }
 
     pub fn register(&mut self, spec: CommandSpec) -> Result<(), AppError> {
@@ -146,7 +187,7 @@ mod tests {
     #[test]
     fn default_registry_contains_expected_commands() {
         let registry = CommandRegistry::with_defaults();
-        assert_eq!(registry.len(), 3);
+        assert_eq!(registry.len(), 7);
     }
 
     #[test]

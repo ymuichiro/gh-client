@@ -27,6 +27,12 @@
   - DTO parse
   - unit tests
   - live test (`gh repo list`)
+- `features/pull_requests` 実装済み:
+  - list/create/review/merge service
+  - command handler
+  - DTO parse
+  - unit tests
+  - live test (`gh pr list`)
 
 ## 既知の仕様メモ
 - `gh repo list` は `--owner` フラグではなく owner を位置引数で渡す。
@@ -39,11 +45,10 @@
   - `GH_TEST_OWNER=$(gh api user --jq .login) GH_CLIENT_LIVE_TEST=1 cargo test --test repositories_live -- --nocapture`
 
 ## 次の実装順序
-1. `features/pull_requests`
-2. `features/issues`
-3. `features/actions`
-4. `features/releases`
-5. `features/settings`
+1. `features/issues`
+2. `features/actions`
+3. `features/releases`
+4. `features/settings`
 
 ## 記録ファイル
 - 履歴: `docs/memory/YYYY-MM-DD-*.md`

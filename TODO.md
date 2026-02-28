@@ -8,7 +8,7 @@
 - [x] `docs/memory/` の運用を開始する。
 
 ## Next
-- [ ] `features/pull_requests` を実装する。
+- [x] `features/pull_requests` を実装する。
 - [ ] `features/issues` を実装する。
 - [ ] `features/actions` を実装する。
 - [ ] `features/releases` を実装する。
