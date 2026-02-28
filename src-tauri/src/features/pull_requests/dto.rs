@@ -25,6 +25,7 @@ pub struct PullRequestSummary {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct PullRequestCreated {
     pub number: u64,
+    #[serde(rename = "html_url")]
     pub url: String,
     pub state: String,
 }
@@ -88,7 +89,7 @@ mod tests {
         let json = r#"
         {
           "number": 12,
-          "url": "https://github.com/octocat/hello/pull/12",
+          "html_url": "https://github.com/octocat/hello/pull/12",
           "state": "OPEN"
         }
         "#;
@@ -100,7 +101,7 @@ mod tests {
 
     #[test]
     fn create_parse_returns_error_for_invalid_shape() {
-        let json = r#"{"url":true}"#;
+        let json = r#"{"html_url":true}"#;
         let err = parse_pull_request_created(json).expect_err("invalid create shape should fail");
         assert_eq!(err.code, ErrorCode::UpstreamError);
     }

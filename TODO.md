@@ -9,10 +9,12 @@
 
 ## Next
 - [x] `features/pull_requests` を実装する。
-- [ ] `features/issues` を実装する。
-- [ ] `features/actions` を実装する。
-- [ ] `features/releases` を実装する。
-- [ ] `features/settings` を実装する。
+- [x] `features/issues` を実装する。
+- [x] `features/actions` を実装する。
+- [x] `features/releases` を実装する。
+- [x] `features/settings` を実装する。
+- [ ] cross-feature E2E シナリオを実装する。
+- [ ] フロントエンド接続用の command payload 契約を固定化する。
 
 ## Test/Quality
 - [ ] destructive command 一覧を明示し、`SAFE_TEST_MODE` ルールをテストに固定する。

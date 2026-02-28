@@ -6,18 +6,18 @@
 - repositories feature 実装
 - 実操作テストの土台作成
 
-## Phase 1: Collaboration Core（進行中）
+## Phase 1: Collaboration Core（完了）
 - pull_requests feature（完了）
-- issues feature
+- issues feature（完了）
 - 目標: 日常開発で必要な操作を backend で完結
 
-## Phase 2: Delivery Core
-- actions feature
-- releases feature
+## Phase 2: Delivery Core（完了）
+- actions feature（完了）
+- releases feature（完了）
 - 目標: CI/CD と配布操作を backend で完結
 
-## Phase 3: Admin Core
-- settings feature（collaborators/secrets/webhooks/protection など）
+## Phase 3: Admin Core（進行中）
+- settings feature（collaborators: 完了 / secrets/webhooks/protection: 未着手）
 - 目標: 管理系機能を安全な権限制御付きで提供
 
 ## Phase 4: Integration Hardening

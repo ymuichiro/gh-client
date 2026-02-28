@@ -23,3 +23,11 @@
 - API 結果は正規化し、UI はバックエンド API のみを参照する
 - 最優先は「不具合の検知容易性」と「セキュリティ安全性」とする
 - バックエンドを feature-based に先行完成し、フロントエンドは後付け実装する
+
+## 実装状況（バックエンド）
+- `repositories`: list/create/delete
+- `pull_requests`: list/create/review/merge
+- `issues`: list/create/comment/close/reopen
+- `actions`: workflow list/run list/rerun/cancel
+- `releases`: list/create/delete
+- `settings`: collaborators list/add/remove

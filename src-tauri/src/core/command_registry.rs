@@ -104,7 +104,7 @@ impl CommandRegistry {
             .register(CommandSpec::new(
                 "pr.create",
                 "gh",
-                &["pr", "create", "--json", "number,url,state"],
+                &["api", "--method", "POST"],
                 CommandSafety::NonDestructive,
             ))
             .expect("default command should register");
@@ -124,6 +124,151 @@ impl CommandRegistry {
                 "gh",
                 &["pr", "merge"],
                 CommandSafety::NonDestructive,
+            ))
+            .expect("default command should register");
+
+        registry
+            .register(CommandSpec::new(
+                "issue.list",
+                "gh",
+                &["issue", "list", "--json", "number,title,state,url,author"],
+                CommandSafety::NonDestructive,
+            ))
+            .expect("default command should register");
+
+        registry
+            .register(CommandSpec::new(
+                "issue.create",
+                "gh",
+                &["issue", "create"],
+                CommandSafety::NonDestructive,
+            ))
+            .expect("default command should register");
+
+        registry
+            .register(CommandSpec::new(
+                "issue.comment",
+                "gh",
+                &["issue", "comment"],
+                CommandSafety::NonDestructive,
+            ))
+            .expect("default command should register");
+
+        registry
+            .register(CommandSpec::new(
+                "issue.close",
+                "gh",
+                &["issue", "close"],
+                CommandSafety::NonDestructive,
+            ))
+            .expect("default command should register");
+
+        registry
+            .register(CommandSpec::new(
+                "issue.reopen",
+                "gh",
+                &["issue", "reopen"],
+                CommandSafety::NonDestructive,
+            ))
+            .expect("default command should register");
+
+        registry
+            .register(CommandSpec::new(
+                "workflow.list",
+                "gh",
+                &["workflow", "list", "--json", "id,name,path,state"],
+                CommandSafety::NonDestructive,
+            ))
+            .expect("default command should register");
+
+        registry
+            .register(CommandSpec::new(
+                "run.list",
+                "gh",
+                &[
+                    "run",
+                    "list",
+                    "--json",
+                    "databaseId,workflowName,headBranch,status,conclusion,url,displayTitle",
+                ],
+                CommandSafety::NonDestructive,
+            ))
+            .expect("default command should register");
+
+        registry
+            .register(CommandSpec::new(
+                "run.rerun",
+                "gh",
+                &["run", "rerun"],
+                CommandSafety::NonDestructive,
+            ))
+            .expect("default command should register");
+
+        registry
+            .register(CommandSpec::new(
+                "run.cancel",
+                "gh",
+                &["run", "cancel"],
+                CommandSafety::NonDestructive,
+            ))
+            .expect("default command should register");
+
+        registry
+            .register(CommandSpec::new(
+                "release.list",
+                "gh",
+                &[
+                    "release",
+                    "list",
+                    "--json",
+                    "tagName,name,isDraft,isPrerelease,publishedAt,createdAt,isLatest",
+                ],
+                CommandSafety::NonDestructive,
+            ))
+            .expect("default command should register");
+
+        registry
+            .register(CommandSpec::new(
+                "release.create",
+                "gh",
+                &["release", "create"],
+                CommandSafety::NonDestructive,
+            ))
+            .expect("default command should register");
+
+        registry
+            .register(CommandSpec::new(
+                "release.delete",
+                "gh",
+                &["release", "delete"],
+                CommandSafety::Destructive,
+            ))
+            .expect("default command should register");
+
+        registry
+            .register(CommandSpec::new(
+                "settings.collaborators.list",
+                "gh",
+                &["api"],
+                CommandSafety::NonDestructive,
+            ))
+            .expect("default command should register");
+
+        registry
+            .register(CommandSpec::new(
+                "settings.collaborators.add",
+                "gh",
+                &["api", "--method", "PUT"],
+                CommandSafety::NonDestructive,
+            ))
+            .expect("default command should register");
+
+        registry
+            .register(CommandSpec::new(
+                "settings.collaborators.remove",
+                "gh",
+                &["api", "--method", "DELETE"],
+                CommandSafety::Destructive,
             ))
             .expect("default command should register");
 
@@ -187,7 +332,7 @@ mod tests {
     #[test]
     fn default_registry_contains_expected_commands() {
         let registry = CommandRegistry::with_defaults();
-        assert_eq!(registry.len(), 7);
+        assert_eq!(registry.len(), 22);
     }
 
     #[test]
