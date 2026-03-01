@@ -25,9 +25,63 @@
 - バックエンドを feature-based に先行完成し、フロントエンドは後付け実装する
 
 ## 実装状況（バックエンド）
-- `repositories`: list/create/delete
-- `pull_requests`: list/create/review/merge
-- `issues`: list/create/comment/close/reopen
-- `actions`: workflow list/run list/rerun/cancel
-- `releases`: list/create/delete
-- `settings`: collaborators list/add/remove
+- `repositories`: list/create/edit/delete, branch list/create/delete, commit list
+- `pull_requests`: list/create/edit/close/reopen/review/merge
+- `issues`: list/create/edit/comment/close/reopen
+- `actions`: workflow list/run list/run detail/run logs/rerun/cancel
+- `releases`: list/create/edit/delete, asset upload/delete
+- `settings`: collaborators, secrets, variables, webhooks, branch protection, deploy keys, dependabot alerts
+
+## ローカルでの起動（現状）
+現時点は **バックエンド（Rust crate）中心** で、GUI 本体の起動コマンドはまだありません。  
+ローカルでは以下の流れで「ビルドと実動作確認」を行います。
+
+1. 依存関係を準備
+- Rust（stable）
+- GitHub CLI `gh`
+- GitHub 認証済み状態（`gh auth status` が成功すること）
+
+2. ルートでビルド
+```bash
+cargo build
+```
+
+3. バックエンドの動作確認（単体テスト）
+```bash
+cargo test
+```
+
+## テスト方法
+### 1. 通常テスト（モック/ユニット中心）
+```bash
+cargo test
+```
+
+### 2. 実 GitHub を使うライブテスト
+事前に `gh` 認証を済ませたうえで実行します。
+
+```bash
+OWNER=$(gh api user --jq .login)
+REPO=$(gh repo list "$OWNER" --json name --limit 1 --jq '.[0].name')
+
+GH_CLIENT_LIVE_TEST=1 \
+GH_TEST_OWNER="$OWNER" \
+GH_TEST_REPO="$REPO" \
+cargo test \
+  --test repositories_live \
+  --test pull_requests_live \
+  --test issues_live \
+  --test actions_live \
+  --test releases_live \
+  --test settings_live \
+  --test e2e_live \
+  -- --nocapture
+```
+
+### 3. feature 単位でライブテストを実行
+```bash
+GH_CLIENT_LIVE_TEST=1 GH_TEST_OWNER="<owner>" GH_TEST_REPO="<repo>" cargo test --test settings_live -- --nocapture
+```
+
+## 補足（安全性）
+- 破壊系コマンドは `SAFE_TEST_MODE=true` のとき no-op になります（テスト時の安全措置）。
