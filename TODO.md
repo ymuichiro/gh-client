@@ -14,9 +14,15 @@
 - [x] `features/releases` を実装する。
 - [x] `features/settings` を実装する。
 - [x] cross-feature E2E シナリオを実装する。
-- [ ] フロントエンド接続用の command payload 契約を固定化する。
+- [x] フロントエンド接続用の command payload 契約を固定化する。
+- [x] P2 coverage（Projects/Discussions/Wiki/Pages/Rulesets/Insights）を実装する。
 
 ## Test/Quality
 - [x] destructive command 一覧を明示し、`SAFE_TEST_MODE` ルールをテストに固定する。
 - [x] `gh --json` の契約テストを feature ごとに増やす。
-- [ ] CI に security check（`cargo audit`, `cargo deny`）を組み込む。
+- [x] CI に security check（`cargo audit`, `cargo deny`）を組み込む。
+- [x] レート制限/ネットワーク障害時の再試行・エラー分類を executor に実装する。
+
+## Upcoming (Frontend)
+- [ ] Tauri アプリの最小起動構成（`cargo tauri dev`）を追加する。
+- [ ] payload contract v1 に沿った UI <-> backend 接続層を実装する。

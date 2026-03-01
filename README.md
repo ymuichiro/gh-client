@@ -12,6 +12,7 @@
 - [システム設計](docs/architecture.md)
 - [バックエンド設計 (`gh` 実行基盤)](docs/backend.md)
 - [実装計画（マイルストーン）](docs/implementation-plan.md)
+- [Frontend Payload Contract](docs/payload-contract.md)
 - [Memory Log](docs/memory/README.md)
 - [TODO](TODO.md)
 - [ROADMAP](ROADMAP.md)
@@ -31,6 +32,12 @@
 - `actions`: workflow list/run list/run detail/run logs/rerun/cancel
 - `releases`: list/create/edit/delete, asset upload/delete
 - `settings`: collaborators, secrets, variables, webhooks, branch protection, deploy keys, dependabot alerts
+- `projects` (P2): project list/item list/item add
+- `discussions` (P2): category list/discussion list/create/close/answer
+- `wiki` (P2): wiki 有効状態の取得/更新
+- `pages` (P2): pages 設定の取得/作成/更新/削除
+- `rulesets` (P2): ruleset list/get/create/update/delete
+- `insights` (P2): traffic views/clones の取得
 
 ## ローカルでの起動（現状）
 現時点は **バックエンド（Rust crate）中心** で、GUI 本体の起動コマンドはまだありません。  
@@ -75,6 +82,7 @@ cargo test \
   --test releases_live \
   --test settings_live \
   --test e2e_live \
+  --test p2_live \
   -- --nocapture
 ```
 

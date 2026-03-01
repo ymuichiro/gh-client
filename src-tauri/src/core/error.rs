@@ -9,6 +9,7 @@ pub enum ErrorCode {
     NotFound,
     ValidationError,
     RateLimited,
+    NetworkError,
     UpstreamError,
     ExecutionError,
 }
@@ -44,6 +45,26 @@ impl AppError {
 
     pub fn execution(message: impl Into<String>) -> Self {
         Self::new(ErrorCode::ExecutionError, message, true)
+    }
+
+    pub fn auth_required(message: impl Into<String>) -> Self {
+        Self::new(ErrorCode::AuthRequired, message, false)
+    }
+
+    pub fn not_found(message: impl Into<String>) -> Self {
+        Self::new(ErrorCode::NotFound, message, false)
+    }
+
+    pub fn rate_limited(message: impl Into<String>) -> Self {
+        Self::new(ErrorCode::RateLimited, message, true)
+    }
+
+    pub fn network(message: impl Into<String>) -> Self {
+        Self::new(ErrorCode::NetworkError, message, true)
+    }
+
+    pub fn upstream(message: impl Into<String>) -> Self {
+        Self::new(ErrorCode::UpstreamError, message, true)
     }
 }
 

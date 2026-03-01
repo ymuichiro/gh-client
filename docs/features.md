@@ -32,12 +32,12 @@
 | Settings | Branch Protection | P1 | `gh api` | rule の作成/更新 |
 | Settings | Deploy Keys | P1 | `gh api` | read-only/write 指定 |
 | Security | Dependabot alerts 一覧/対応導線 | P1 | `gh api` | dismiss/reopen は API |
-| Projects | リポジトリ紐づけ Project 操作 | P2 | `gh project` + GraphQL | 新 Projects 優先 |
-| Discussions | 一覧/作成/回答/クローズ | P2 | `gh api` (GraphQL) | CLI の直接サポートが薄い |
-| Wiki | 有効化状態確認と導線 | P2 | `gh api` + 外部エディタ | 直接編集は後続 |
-| Insights | Traffic（views/clones）表示 | P2 | `gh api` | read-only 中心 |
-| Pages | Pages 設定（source/build） | P2 | `gh api` | |
-| Rulesets | ルールセット管理 | P2 | `gh api` | 組織ルールとの整合表示 |
+| Projects | リポジトリ紐づけ Project 操作 | P2 | `gh api graphql` | backend 実装済（read:project scope が必要） |
+| Discussions | 一覧/作成/回答/クローズ | P2 | `gh api graphql` | backend 実装済 |
+| Wiki | 有効化状態確認と導線 | P2 | `gh api` + 外部エディタ | backend 実装済（編集導線は後続） |
+| Insights | Traffic（views/clones）表示 | P2 | `gh api` | backend 実装済（read-only） |
+| Pages | Pages 設定（source/build） | P2 | `gh api` | backend 実装済 |
+| Rulesets | ルールセット管理 | P2 | `gh api` | backend 実装済 |
 
 ## 画面単位の機能一覧（P0）
 1. Dashboard
@@ -79,4 +79,4 @@
 - Collaborators, Secrets/Variables, Webhooks, Branch Protection
 
 3. Phase 3（P2 Coverage）
-- Discussions, Projects, Insights, Pages, Rulesets
+- Discussions, Projects, Insights, Pages, Rulesets（backend 実装済）

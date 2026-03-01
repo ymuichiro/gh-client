@@ -6,6 +6,12 @@
 - Test Realism First: テストは本番相当の実操作を基本とする
 - Safety Exception: 削除系など破壊的操作はテスト時のみダミー化する
 
+## 現在ステータス（2026-03-01）
+- Phase A: 完了
+- Phase B: 完了（P0/P1 + P2 の backend module 実装済み）
+- Phase C: 完了（cross-feature E2E / resilience / security CI）
+- Phase D: 未着手（次フェーズ）
+
 ## 開発フェーズ
 1. Phase A: Core Foundation（最優先）
 - `CommandRegistry`, `Executor`, `PolicyGuard`, `ErrorModel`, `Observability` を実装
@@ -26,7 +32,7 @@
 - 実操作テスト: 専用 GitHub テスト repo で主要ユースケースが成功
 - 監査要件: 重要操作が audit log に正しく記録される
 
-3. Phase C: Backend Integration Hardening
+3. Phase C: Backend Integration Hardening（完了）
 - 全モジュール統合後に cross-feature シナリオを検証
 - レート制限、ネットワーク障害、`gh` バージョン差分の耐性確認
 
@@ -34,7 +40,7 @@
 - E2E 主要導線（PR 作成->レビュー->マージ、Issue 運用、Actions rerun、Release 作成）が成功
 - Security CI (`cargo audit`, `cargo deny`) と権限回避テストが常時グリーン
 
-4. Phase D: Frontend Implementation（後付け）
+4. Phase D: Frontend Implementation（後付け / 次フェーズ）
 - バックエンド API/command 契約に従って UI を実装
 - UI 側ロジックは薄く保ち、業務ロジックは追加しない
 

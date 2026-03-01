@@ -20,11 +20,11 @@
 - settings feature（collaborators / secrets / variables / webhooks / branch protection / deploy keys / dependabot alerts）
 - 目標: 管理系機能を安全な権限制御付きで提供
 
-## Phase 4: Integration Hardening（進行中）
+## Phase 4: Integration Hardening（完了）
 - cross-feature E2E（完了）
-- レート制限・ネットワーク障害・`gh` 差分への耐性確認
-- セキュリティ検査を CI で常時グリーン化
+- レート制限・ネットワーク障害への再試行/分類（完了）
+- セキュリティ検査 CI（`cargo audit`, `cargo deny`）常時実行（完了）
 
-## Phase 5: Frontend Attach
+## Phase 5: Frontend Attach（次フェーズ）
 - backend 契約に追従する UI 実装
 - UI は薄い層に限定し、業務ロジックを持たせない

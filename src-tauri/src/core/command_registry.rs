@@ -571,6 +571,195 @@ impl CommandRegistry {
             .expect("default command should register");
 
         registry
+            .register(CommandSpec::new(
+                "insights.views.get",
+                "gh",
+                &["api"],
+                CommandSafety::NonDestructive,
+            ))
+            .expect("default command should register");
+
+        registry
+            .register(CommandSpec::new(
+                "insights.clones.get",
+                "gh",
+                &["api"],
+                CommandSafety::NonDestructive,
+            ))
+            .expect("default command should register");
+
+        registry
+            .register(CommandSpec::new(
+                "projects.list",
+                "gh",
+                &["api", "graphql"],
+                CommandSafety::NonDestructive,
+            ))
+            .expect("default command should register");
+
+        registry
+            .register(CommandSpec::new(
+                "projects.items.list",
+                "gh",
+                &["api", "graphql"],
+                CommandSafety::NonDestructive,
+            ))
+            .expect("default command should register");
+
+        registry
+            .register(CommandSpec::new(
+                "projects.items.add",
+                "gh",
+                &["api", "graphql"],
+                CommandSafety::NonDestructive,
+            ))
+            .expect("default command should register");
+
+        registry
+            .register(CommandSpec::new(
+                "discussions.categories.list",
+                "gh",
+                &["api", "graphql"],
+                CommandSafety::NonDestructive,
+            ))
+            .expect("default command should register");
+
+        registry
+            .register(CommandSpec::new(
+                "discussions.list",
+                "gh",
+                &["api", "graphql"],
+                CommandSafety::NonDestructive,
+            ))
+            .expect("default command should register");
+
+        registry
+            .register(CommandSpec::new(
+                "discussions.create",
+                "gh",
+                &["api", "graphql"],
+                CommandSafety::NonDestructive,
+            ))
+            .expect("default command should register");
+
+        registry
+            .register(CommandSpec::new(
+                "discussions.close",
+                "gh",
+                &["api", "graphql"],
+                CommandSafety::NonDestructive,
+            ))
+            .expect("default command should register");
+
+        registry
+            .register(CommandSpec::new(
+                "discussions.answer",
+                "gh",
+                &["api", "graphql"],
+                CommandSafety::NonDestructive,
+            ))
+            .expect("default command should register");
+
+        registry
+            .register(CommandSpec::new(
+                "wiki.get",
+                "gh",
+                &["api"],
+                CommandSafety::NonDestructive,
+            ))
+            .expect("default command should register");
+
+        registry
+            .register(CommandSpec::new(
+                "wiki.update",
+                "gh",
+                &["api", "--method", "PATCH"],
+                CommandSafety::NonDestructive,
+            ))
+            .expect("default command should register");
+
+        registry
+            .register(CommandSpec::new(
+                "pages.get",
+                "gh",
+                &["api"],
+                CommandSafety::NonDestructive,
+            ))
+            .expect("default command should register");
+
+        registry
+            .register(CommandSpec::new(
+                "pages.create",
+                "gh",
+                &["api", "--method", "POST"],
+                CommandSafety::NonDestructive,
+            ))
+            .expect("default command should register");
+
+        registry
+            .register(CommandSpec::new(
+                "pages.update",
+                "gh",
+                &["api", "--method", "PUT"],
+                CommandSafety::NonDestructive,
+            ))
+            .expect("default command should register");
+
+        registry
+            .register(CommandSpec::new(
+                "pages.delete",
+                "gh",
+                &["api", "--method", "DELETE"],
+                CommandSafety::Destructive,
+            ))
+            .expect("default command should register");
+
+        registry
+            .register(CommandSpec::new(
+                "rulesets.list",
+                "gh",
+                &["api"],
+                CommandSafety::NonDestructive,
+            ))
+            .expect("default command should register");
+
+        registry
+            .register(CommandSpec::new(
+                "rulesets.get",
+                "gh",
+                &["api"],
+                CommandSafety::NonDestructive,
+            ))
+            .expect("default command should register");
+
+        registry
+            .register(CommandSpec::new(
+                "rulesets.create",
+                "gh",
+                &["api", "--method", "POST"],
+                CommandSafety::NonDestructive,
+            ))
+            .expect("default command should register");
+
+        registry
+            .register(CommandSpec::new(
+                "rulesets.update",
+                "gh",
+                &["api", "--method", "PUT"],
+                CommandSafety::NonDestructive,
+            ))
+            .expect("default command should register");
+
+        registry
+            .register(CommandSpec::new(
+                "rulesets.delete",
+                "gh",
+                &["api", "--method", "DELETE"],
+                CommandSafety::Destructive,
+            ))
+            .expect("default command should register");
+
+        registry
     }
 
     pub fn register(&mut self, spec: CommandSpec) -> Result<(), AppError> {
@@ -621,6 +810,12 @@ impl CommandRegistry {
     pub fn len(&self) -> usize {
         self.specs.len()
     }
+
+    pub fn command_ids(&self) -> Vec<&'static str> {
+        let mut ids = self.specs.keys().copied().collect::<Vec<_>>();
+        ids.sort_unstable();
+        ids
+    }
 }
 
 #[cfg(test)]
@@ -630,7 +825,7 @@ mod tests {
     #[test]
     fn default_registry_contains_expected_commands() {
         let registry = CommandRegistry::with_defaults();
-        assert_eq!(registry.len(), 54);
+        assert_eq!(registry.len(), 75);
     }
 
     #[test]

@@ -1,6 +1,12 @@
 pub mod actions;
+pub mod discussions;
+pub mod insights;
 pub mod issues;
+pub mod pages;
+pub mod projects;
 pub mod pull_requests;
 pub mod releases;
 pub mod repositories;
+pub mod rulesets;
 pub mod settings;
+pub mod wiki;
