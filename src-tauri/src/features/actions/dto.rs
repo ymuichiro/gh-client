@@ -25,6 +25,27 @@ pub struct RunSummary {
     pub display_title: Option<String>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct RunJobSummary {
+    #[serde(rename = "databaseId")]
+    pub database_id: Option<u64>,
+    pub name: Option<String>,
+    pub status: Option<String>,
+    pub conclusion: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct RunDetail {
+    #[serde(rename = "databaseId")]
+    pub database_id: u64,
+    pub status: String,
+    pub conclusion: Option<String>,
+    pub url: String,
+    #[serde(rename = "workflowName")]
+    pub workflow_name: Option<String>,
+    pub jobs: Option<Vec<RunJobSummary>>,
+}
+
 pub fn parse_workflow_summaries(payload: &str) -> Result<Vec<WorkflowSummary>, AppError> {
     if payload.trim().is_empty() {
         return Ok(Vec::new());
@@ -48,6 +69,16 @@ pub fn parse_run_summaries(payload: &str) -> Result<Vec<RunSummary>, AppError> {
         AppError::new(
             ErrorCode::UpstreamError,
             format!("failed to parse run list payload: {}", err),
+            false,
+        )
+    })
+}
+
+pub fn parse_run_detail(payload: &str) -> Result<RunDetail, AppError> {
+    serde_json::from_str(payload).map_err(|err| {
+        AppError::new(
+            ErrorCode::UpstreamError,
+            format!("failed to parse run detail payload: {}", err),
             false,
         )
     })
@@ -94,5 +125,13 @@ mod tests {
 
         let runs = parse_run_summaries("").expect("empty payload should be allowed");
         assert!(runs.is_empty());
+    }
+
+    #[test]
+    fn parses_run_detail_payload() {
+        let json = r#"{"databaseId":10,"status":"completed","conclusion":"success","url":"https://example/run/10","workflowName":"CI","jobs":[{"databaseId":1,"name":"build","status":"completed","conclusion":"success"}]}"#;
+        let detail = parse_run_detail(json).expect("run detail should parse");
+        assert_eq!(detail.database_id, 10);
+        assert_eq!(detail.status, "completed");
     }
 }

@@ -5,7 +5,8 @@ use crate::core::policy_guard::RepoPermission;
 
 use super::dto::{IssueCreated, IssueSummary};
 use super::service::{
-    CloseIssueInput, CommentIssueInput, CreateIssueInput, IssuesService, ReopenIssueInput,
+    CloseIssueInput, CommentIssueInput, CreateIssueInput, EditIssueInput, IssuesService,
+    ReopenIssueInput,
 };
 
 pub struct IssuesCommandHandler<R: Runner> {
@@ -56,6 +57,16 @@ impl<R: Runner> IssuesCommandHandler<R> {
     ) -> Result<(), AppError> {
         let trace = TraceContext::new(request_id);
         self.service.close(permission, input, &trace)
+    }
+
+    pub fn edit_issue(
+        &self,
+        request_id: &str,
+        permission: RepoPermission,
+        input: &EditIssueInput,
+    ) -> Result<(), AppError> {
+        let trace = TraceContext::new(request_id);
+        self.service.edit(permission, input, &trace)
     }
 
     pub fn reopen_issue(

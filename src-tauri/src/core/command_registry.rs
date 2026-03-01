@@ -79,6 +79,69 @@ impl CommandRegistry {
 
         registry
             .register(CommandSpec::new(
+                "repo.edit",
+                "gh",
+                &["repo", "edit"],
+                CommandSafety::NonDestructive,
+            ))
+            .expect("default command should register");
+
+        registry
+            .register(CommandSpec::new(
+                "repo.topics.replace",
+                "gh",
+                &["api", "--method", "PUT"],
+                CommandSafety::NonDestructive,
+            ))
+            .expect("default command should register");
+
+        registry
+            .register(CommandSpec::new(
+                "repo.branches.list",
+                "gh",
+                &["api"],
+                CommandSafety::NonDestructive,
+            ))
+            .expect("default command should register");
+
+        registry
+            .register(CommandSpec::new(
+                "repo.branch.ref.get",
+                "gh",
+                &["api"],
+                CommandSafety::NonDestructive,
+            ))
+            .expect("default command should register");
+
+        registry
+            .register(CommandSpec::new(
+                "repo.branch.create",
+                "gh",
+                &["api", "--method", "POST"],
+                CommandSafety::NonDestructive,
+            ))
+            .expect("default command should register");
+
+        registry
+            .register(CommandSpec::new(
+                "repo.branch.delete",
+                "gh",
+                &["api", "--method", "DELETE"],
+                CommandSafety::Destructive,
+            ))
+            .expect("default command should register");
+
+        registry
+            .register(CommandSpec::new(
+                "repo.commits.list",
+                "gh",
+                &["api"],
+                CommandSafety::NonDestructive,
+            ))
+            .expect("default command should register");
+
+        registry
+            .register(CommandSpec::new(
                 "repo.delete",
                 "gh",
                 &["repo", "delete"],
@@ -120,6 +183,33 @@ impl CommandRegistry {
 
         registry
             .register(CommandSpec::new(
+                "pr.edit",
+                "gh",
+                &["pr", "edit"],
+                CommandSafety::NonDestructive,
+            ))
+            .expect("default command should register");
+
+        registry
+            .register(CommandSpec::new(
+                "pr.close",
+                "gh",
+                &["pr", "close"],
+                CommandSafety::NonDestructive,
+            ))
+            .expect("default command should register");
+
+        registry
+            .register(CommandSpec::new(
+                "pr.reopen",
+                "gh",
+                &["pr", "reopen"],
+                CommandSafety::NonDestructive,
+            ))
+            .expect("default command should register");
+
+        registry
+            .register(CommandSpec::new(
                 "pr.merge",
                 "gh",
                 &["pr", "merge"],
@@ -150,6 +240,15 @@ impl CommandRegistry {
                 "issue.comment",
                 "gh",
                 &["issue", "comment"],
+                CommandSafety::NonDestructive,
+            ))
+            .expect("default command should register");
+
+        registry
+            .register(CommandSpec::new(
+                "issue.edit",
+                "gh",
+                &["issue", "edit"],
                 CommandSafety::NonDestructive,
             ))
             .expect("default command should register");
@@ -206,6 +305,29 @@ impl CommandRegistry {
 
         registry
             .register(CommandSpec::new(
+                "run.view",
+                "gh",
+                &[
+                    "run",
+                    "view",
+                    "--json",
+                    "databaseId,status,conclusion,url,workflowName,jobs",
+                ],
+                CommandSafety::NonDestructive,
+            ))
+            .expect("default command should register");
+
+        registry
+            .register(CommandSpec::new(
+                "run.logs",
+                "gh",
+                &["run", "view", "--log"],
+                CommandSafety::NonDestructive,
+            ))
+            .expect("default command should register");
+
+        registry
+            .register(CommandSpec::new(
                 "run.cancel",
                 "gh",
                 &["run", "cancel"],
@@ -233,6 +355,33 @@ impl CommandRegistry {
                 "gh",
                 &["release", "create"],
                 CommandSafety::NonDestructive,
+            ))
+            .expect("default command should register");
+
+        registry
+            .register(CommandSpec::new(
+                "release.edit",
+                "gh",
+                &["release", "edit"],
+                CommandSafety::NonDestructive,
+            ))
+            .expect("default command should register");
+
+        registry
+            .register(CommandSpec::new(
+                "release.asset.upload",
+                "gh",
+                &["release", "upload"],
+                CommandSafety::NonDestructive,
+            ))
+            .expect("default command should register");
+
+        registry
+            .register(CommandSpec::new(
+                "release.asset.delete",
+                "gh",
+                &["release", "delete-asset"],
+                CommandSafety::Destructive,
             ))
             .expect("default command should register");
 
@@ -269,6 +418,155 @@ impl CommandRegistry {
                 "gh",
                 &["api", "--method", "DELETE"],
                 CommandSafety::Destructive,
+            ))
+            .expect("default command should register");
+
+        registry
+            .register(CommandSpec::new(
+                "settings.secrets.list",
+                "gh",
+                &["secret", "list", "--json", "name,updatedAt,visibility"],
+                CommandSafety::NonDestructive,
+            ))
+            .expect("default command should register");
+
+        registry
+            .register(CommandSpec::new(
+                "settings.secrets.set",
+                "gh",
+                &["secret", "set"],
+                CommandSafety::NonDestructive,
+            ))
+            .expect("default command should register");
+
+        registry
+            .register(CommandSpec::new(
+                "settings.secrets.delete",
+                "gh",
+                &["secret", "delete"],
+                CommandSafety::Destructive,
+            ))
+            .expect("default command should register");
+
+        registry
+            .register(CommandSpec::new(
+                "settings.variables.list",
+                "gh",
+                &[
+                    "variable",
+                    "list",
+                    "--json",
+                    "name,value,updatedAt,createdAt,visibility",
+                ],
+                CommandSafety::NonDestructive,
+            ))
+            .expect("default command should register");
+
+        registry
+            .register(CommandSpec::new(
+                "settings.variables.set",
+                "gh",
+                &["variable", "set"],
+                CommandSafety::NonDestructive,
+            ))
+            .expect("default command should register");
+
+        registry
+            .register(CommandSpec::new(
+                "settings.variables.delete",
+                "gh",
+                &["variable", "delete"],
+                CommandSafety::Destructive,
+            ))
+            .expect("default command should register");
+
+        registry
+            .register(CommandSpec::new(
+                "settings.webhooks.list",
+                "gh",
+                &["api"],
+                CommandSafety::NonDestructive,
+            ))
+            .expect("default command should register");
+
+        registry
+            .register(CommandSpec::new(
+                "settings.webhooks.create",
+                "gh",
+                &["api", "--method", "POST"],
+                CommandSafety::NonDestructive,
+            ))
+            .expect("default command should register");
+
+        registry
+            .register(CommandSpec::new(
+                "settings.webhooks.ping",
+                "gh",
+                &["api", "--method", "POST"],
+                CommandSafety::NonDestructive,
+            ))
+            .expect("default command should register");
+
+        registry
+            .register(CommandSpec::new(
+                "settings.webhooks.delete",
+                "gh",
+                &["api", "--method", "DELETE"],
+                CommandSafety::Destructive,
+            ))
+            .expect("default command should register");
+
+        registry
+            .register(CommandSpec::new(
+                "settings.branch_protection.get",
+                "gh",
+                &["api"],
+                CommandSafety::NonDestructive,
+            ))
+            .expect("default command should register");
+
+        registry
+            .register(CommandSpec::new(
+                "settings.branch_protection.update",
+                "gh",
+                &["api", "--method", "PUT"],
+                CommandSafety::NonDestructive,
+            ))
+            .expect("default command should register");
+
+        registry
+            .register(CommandSpec::new(
+                "settings.deploy_keys.list",
+                "gh",
+                &["api"],
+                CommandSafety::NonDestructive,
+            ))
+            .expect("default command should register");
+
+        registry
+            .register(CommandSpec::new(
+                "settings.deploy_keys.add",
+                "gh",
+                &["api", "--method", "POST"],
+                CommandSafety::NonDestructive,
+            ))
+            .expect("default command should register");
+
+        registry
+            .register(CommandSpec::new(
+                "settings.deploy_keys.delete",
+                "gh",
+                &["api", "--method", "DELETE"],
+                CommandSafety::Destructive,
+            ))
+            .expect("default command should register");
+
+        registry
+            .register(CommandSpec::new(
+                "settings.dependabot_alerts.list",
+                "gh",
+                &["api"],
+                CommandSafety::NonDestructive,
             ))
             .expect("default command should register");
 
@@ -332,7 +630,7 @@ mod tests {
     #[test]
     fn default_registry_contains_expected_commands() {
         let registry = CommandRegistry::with_defaults();
-        assert_eq!(registry.len(), 22);
+        assert_eq!(registry.len(), 54);
     }
 
     #[test]

@@ -5,7 +5,8 @@ use crate::core::policy_guard::RepoPermission;
 
 use super::dto::{PullRequestCreated, PullRequestSummary};
 use super::service::{
-    CreatePullRequestInput, MergePullRequestInput, PullRequestsService, ReviewPullRequestInput,
+    ClosePullRequestInput, CreatePullRequestInput, EditPullRequestInput, MergePullRequestInput,
+    PullRequestsService, ReopenPullRequestInput, ReviewPullRequestInput,
 };
 
 pub struct PullRequestsCommandHandler<R: Runner> {
@@ -48,6 +49,16 @@ impl<R: Runner> PullRequestsCommandHandler<R> {
         self.service.review(permission, input, &trace)
     }
 
+    pub fn edit_pull_request(
+        &self,
+        request_id: &str,
+        permission: RepoPermission,
+        input: &EditPullRequestInput,
+    ) -> Result<(), AppError> {
+        let trace = TraceContext::new(request_id);
+        self.service.edit(permission, input, &trace)
+    }
+
     pub fn merge_pull_request(
         &self,
         request_id: &str,
@@ -56,5 +67,25 @@ impl<R: Runner> PullRequestsCommandHandler<R> {
     ) -> Result<(), AppError> {
         let trace = TraceContext::new(request_id);
         self.service.merge(permission, input, &trace)
+    }
+
+    pub fn close_pull_request(
+        &self,
+        request_id: &str,
+        permission: RepoPermission,
+        input: &ClosePullRequestInput,
+    ) -> Result<(), AppError> {
+        let trace = TraceContext::new(request_id);
+        self.service.close(permission, input, &trace)
+    }
+
+    pub fn reopen_pull_request(
+        &self,
+        request_id: &str,
+        permission: RepoPermission,
+        input: &ReopenPullRequestInput,
+    ) -> Result<(), AppError> {
+        let trace = TraceContext::new(request_id);
+        self.service.reopen(permission, input, &trace)
     }
 }

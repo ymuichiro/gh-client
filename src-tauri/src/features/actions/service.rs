@@ -4,7 +4,10 @@ use crate::core::executor::{CommandExecutor, Runner};
 use crate::core::observability::TraceContext;
 use crate::core::policy_guard::{PolicyGuard, RepoPermission};
 
-use super::dto::{RunSummary, WorkflowSummary, parse_run_summaries, parse_workflow_summaries};
+use super::dto::{
+    RunDetail, RunSummary, WorkflowSummary, parse_run_detail, parse_run_summaries,
+    parse_workflow_summaries,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RunActionInput {
@@ -137,6 +140,54 @@ impl<R: Runner> ActionsService<R> {
         let req = self.registry.build_request("run.cancel", &args)?;
         let _ = self.executor.execute(&req, trace)?;
         Ok(())
+    }
+
+    pub fn view_run(
+        &self,
+        owner: &str,
+        repo: &str,
+        run_id: u64,
+        trace: &TraceContext,
+    ) -> Result<RunDetail, AppError> {
+        if owner.trim().is_empty() || repo.trim().is_empty() {
+            return Err(AppError::validation("owner and repo are required"));
+        }
+        if run_id == 0 {
+            return Err(AppError::validation("run id must be greater than 0"));
+        }
+
+        let args = vec![
+            run_id.to_string(),
+            "--repo".to_string(),
+            format!("{}/{}", owner, repo),
+        ];
+        let req = self.registry.build_request("run.view", &args)?;
+        let (output, _audit) = self.executor.execute(&req, trace)?;
+        parse_run_detail(&output.stdout)
+    }
+
+    pub fn view_run_logs(
+        &self,
+        owner: &str,
+        repo: &str,
+        run_id: u64,
+        trace: &TraceContext,
+    ) -> Result<String, AppError> {
+        if owner.trim().is_empty() || repo.trim().is_empty() {
+            return Err(AppError::validation("owner and repo are required"));
+        }
+        if run_id == 0 {
+            return Err(AppError::validation("run id must be greater than 0"));
+        }
+
+        let args = vec![
+            run_id.to_string(),
+            "--repo".to_string(),
+            format!("{}/{}", owner, repo),
+        ];
+        let req = self.registry.build_request("run.logs", &args)?;
+        let (output, _audit) = self.executor.execute(&req, trace)?;
+        Ok(output.stdout)
     }
 }
 
@@ -295,5 +346,51 @@ mod tests {
 
         let (_program, args) = state.last_call().expect("command should be called");
         assert!(args.contains(&"cancel".to_string()));
+    }
+
+    #[test]
+    fn view_run_executes_command() {
+        let output = RawExecutionOutput {
+            exit_code: 0,
+            stdout: r#"{"databaseId":11,"status":"completed","conclusion":"success","url":"https://example/run/11","workflowName":"CI","jobs":[{"databaseId":1,"name":"build","status":"completed","conclusion":"success"}]}"#.into(),
+            stderr: String::new(),
+        };
+
+        let (runner, state) = RecordingRunner::new(output);
+        let service = ActionsService::new(
+            CommandRegistry::with_defaults(),
+            CommandExecutor::new(runner, false),
+        );
+
+        let detail = service
+            .view_run("octocat", "hello", 11, &trace())
+            .expect("view run should succeed");
+        assert_eq!(detail.database_id, 11);
+
+        let (_program, args) = state.last_call().expect("command should be called");
+        assert!(args.contains(&"view".to_string()));
+    }
+
+    #[test]
+    fn view_run_logs_executes_command() {
+        let output = RawExecutionOutput {
+            exit_code: 0,
+            stdout: "log lines".into(),
+            stderr: String::new(),
+        };
+
+        let (runner, state) = RecordingRunner::new(output);
+        let service = ActionsService::new(
+            CommandRegistry::with_defaults(),
+            CommandExecutor::new(runner, false),
+        );
+
+        let logs = service
+            .view_run_logs("octocat", "hello", 11, &trace())
+            .expect("view run logs should succeed");
+        assert_eq!(logs, "log lines");
+
+        let (_program, args) = state.last_call().expect("command should be called");
+        assert!(args.contains(&"--log".to_string()));
     }
 }

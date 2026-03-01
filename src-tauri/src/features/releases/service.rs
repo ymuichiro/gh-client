@@ -78,6 +78,109 @@ impl DeleteReleaseInput {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EditReleaseInput {
+    pub owner: String,
+    pub repo: String,
+    pub tag: String,
+    pub title: Option<String>,
+    pub notes: Option<String>,
+    pub draft: Option<bool>,
+    pub prerelease: Option<bool>,
+}
+
+impl EditReleaseInput {
+    pub fn validate(&self) -> Result<(), AppError> {
+        if self.owner.trim().is_empty() || self.repo.trim().is_empty() {
+            return Err(AppError::validation("owner and repo are required"));
+        }
+        if self.tag.trim().is_empty() {
+            return Err(AppError::validation("tag is required"));
+        }
+
+        if self.title.is_none()
+            && self.notes.is_none()
+            && self.draft.is_none()
+            && self.prerelease.is_none()
+        {
+            return Err(AppError::validation(
+                "at least one editable field must be provided",
+            ));
+        }
+
+        if self
+            .title
+            .as_ref()
+            .is_some_and(|value| value.trim().is_empty())
+        {
+            return Err(AppError::validation(
+                "title must not be empty when provided",
+            ));
+        }
+
+        if self
+            .notes
+            .as_ref()
+            .is_some_and(|value| value.trim().is_empty())
+        {
+            return Err(AppError::validation(
+                "notes must not be empty when provided",
+            ));
+        }
+
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UploadReleaseAssetInput {
+    pub owner: String,
+    pub repo: String,
+    pub tag: String,
+    pub file_path: String,
+    pub clobber: bool,
+}
+
+impl UploadReleaseAssetInput {
+    pub fn validate(&self) -> Result<(), AppError> {
+        if self.owner.trim().is_empty() || self.repo.trim().is_empty() {
+            return Err(AppError::validation("owner and repo are required"));
+        }
+        if self.tag.trim().is_empty() {
+            return Err(AppError::validation("tag is required"));
+        }
+        if self.file_path.trim().is_empty() {
+            return Err(AppError::validation("file_path is required"));
+        }
+
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DeleteReleaseAssetInput {
+    pub owner: String,
+    pub repo: String,
+    pub tag: String,
+    pub asset_name: String,
+}
+
+impl DeleteReleaseAssetInput {
+    pub fn validate(&self) -> Result<(), AppError> {
+        if self.owner.trim().is_empty() || self.repo.trim().is_empty() {
+            return Err(AppError::validation("owner and repo are required"));
+        }
+        if self.tag.trim().is_empty() {
+            return Err(AppError::validation("tag is required"));
+        }
+        if self.asset_name.trim().is_empty() {
+            return Err(AppError::validation("asset_name is required"));
+        }
+
+        Ok(())
+    }
+}
+
 pub struct ReleasesService<R: Runner> {
     registry: CommandRegistry,
     executor: CommandExecutor<R>,
@@ -184,6 +287,93 @@ impl<R: Runner> ReleasesService<R> {
         }
 
         let req = self.registry.build_request("release.delete", &args)?;
+        let _ = self.executor.execute(&req, trace)?;
+        Ok(())
+    }
+
+    pub fn edit(
+        &self,
+        permission: RepoPermission,
+        input: &EditReleaseInput,
+        trace: &TraceContext,
+    ) -> Result<(), AppError> {
+        self.policy_guard
+            .require(RepoPermission::Write, permission, "release.edit")?;
+        input.validate()?;
+
+        let mut args = vec![
+            input.tag.clone(),
+            "--repo".to_string(),
+            format!("{}/{}", input.owner, input.repo),
+        ];
+
+        if let Some(title) = input.title.as_ref() {
+            args.push("--title".to_string());
+            args.push(title.clone());
+        }
+
+        if let Some(notes) = input.notes.as_ref() {
+            args.push("--notes".to_string());
+            args.push(notes.clone());
+        }
+
+        if let Some(draft) = input.draft {
+            args.push(format!("--draft={}", draft));
+        }
+
+        if let Some(prerelease) = input.prerelease {
+            args.push(format!("--prerelease={}", prerelease));
+        }
+
+        let req = self.registry.build_request("release.edit", &args)?;
+        let _ = self.executor.execute(&req, trace)?;
+        Ok(())
+    }
+
+    pub fn upload_asset(
+        &self,
+        permission: RepoPermission,
+        input: &UploadReleaseAssetInput,
+        trace: &TraceContext,
+    ) -> Result<(), AppError> {
+        self.policy_guard
+            .require(RepoPermission::Write, permission, "release.asset.upload")?;
+        input.validate()?;
+
+        let mut args = vec![
+            input.tag.clone(),
+            input.file_path.clone(),
+            "--repo".to_string(),
+            format!("{}/{}", input.owner, input.repo),
+        ];
+        if input.clobber {
+            args.push("--clobber".to_string());
+        }
+
+        let req = self.registry.build_request("release.asset.upload", &args)?;
+        let _ = self.executor.execute(&req, trace)?;
+        Ok(())
+    }
+
+    pub fn delete_asset(
+        &self,
+        permission: RepoPermission,
+        input: &DeleteReleaseAssetInput,
+        trace: &TraceContext,
+    ) -> Result<(), AppError> {
+        self.policy_guard
+            .require(RepoPermission::Admin, permission, "release.asset.delete")?;
+        input.validate()?;
+
+        let args = vec![
+            input.tag.clone(),
+            input.asset_name.clone(),
+            "--repo".to_string(),
+            format!("{}/{}", input.owner, input.repo),
+            "--yes".to_string(),
+        ];
+
+        let req = self.registry.build_request("release.asset.delete", &args)?;
         let _ = self.executor.execute(&req, trace)?;
         Ok(())
     }
@@ -350,5 +540,90 @@ mod tests {
             .delete(RepoPermission::Write, &input, &trace())
             .expect_err("write should not delete release");
         assert_eq!(err.code, ErrorCode::PermissionDenied);
+    }
+
+    #[test]
+    fn edit_executes_command() {
+        let (runner, state) = RecordingRunner::new(RawExecutionOutput {
+            exit_code: 0,
+            stdout: String::new(),
+            stderr: String::new(),
+        });
+        let service = ReleasesService::new(
+            CommandRegistry::with_defaults(),
+            CommandExecutor::new(runner, false),
+        );
+
+        let input = EditReleaseInput {
+            owner: "octocat".into(),
+            repo: "hello".into(),
+            tag: "v1.0.0".into(),
+            title: Some("new title".into()),
+            notes: None,
+            draft: Some(false),
+            prerelease: None,
+        };
+
+        service
+            .edit(RepoPermission::Write, &input, &trace())
+            .expect("edit should succeed");
+
+        let (_program, args) = state.last_call().expect("command should be called");
+        assert!(args.contains(&"--title".to_string()));
+        assert!(args.contains(&"--draft=false".to_string()));
+    }
+
+    #[test]
+    fn upload_asset_executes_command() {
+        let (runner, state) = RecordingRunner::new(RawExecutionOutput {
+            exit_code: 0,
+            stdout: String::new(),
+            stderr: String::new(),
+        });
+        let service = ReleasesService::new(
+            CommandRegistry::with_defaults(),
+            CommandExecutor::new(runner, false),
+        );
+
+        let input = UploadReleaseAssetInput {
+            owner: "octocat".into(),
+            repo: "hello".into(),
+            tag: "v1.0.0".into(),
+            file_path: "/tmp/asset.zip".into(),
+            clobber: true,
+        };
+
+        service
+            .upload_asset(RepoPermission::Write, &input, &trace())
+            .expect("upload should succeed");
+
+        let (_program, args) = state.last_call().expect("command should be called");
+        assert!(args.contains(&"--clobber".to_string()));
+    }
+
+    #[test]
+    fn delete_asset_is_noop_in_safe_test_mode() {
+        let (runner, state) = RecordingRunner::new(RawExecutionOutput {
+            exit_code: 0,
+            stdout: String::new(),
+            stderr: String::new(),
+        });
+        let service = ReleasesService::new(
+            CommandRegistry::with_defaults(),
+            CommandExecutor::new(runner, true),
+        );
+
+        let input = DeleteReleaseAssetInput {
+            owner: "octocat".into(),
+            repo: "hello".into(),
+            tag: "v1.0.0".into(),
+            asset_name: "asset.zip".into(),
+        };
+
+        service
+            .delete_asset(RepoPermission::Admin, &input, &trace())
+            .expect("delete asset should no-op");
+
+        assert_eq!(state.call_count(), 0);
     }
 }

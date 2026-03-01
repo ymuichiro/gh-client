@@ -4,7 +4,10 @@ use crate::core::observability::TraceContext;
 use crate::core::policy_guard::RepoPermission;
 
 use super::dto::{ReleaseCreated, ReleaseSummary};
-use super::service::{CreateReleaseInput, DeleteReleaseInput, ReleasesService};
+use super::service::{
+    CreateReleaseInput, DeleteReleaseAssetInput, DeleteReleaseInput, EditReleaseInput,
+    ReleasesService, UploadReleaseAssetInput,
+};
 
 pub struct ReleasesCommandHandler<R: Runner> {
     service: ReleasesService<R>,
@@ -44,5 +47,35 @@ impl<R: Runner> ReleasesCommandHandler<R> {
     ) -> Result<(), AppError> {
         let trace = TraceContext::new(request_id);
         self.service.delete(permission, input, &trace)
+    }
+
+    pub fn edit_release(
+        &self,
+        request_id: &str,
+        permission: RepoPermission,
+        input: &EditReleaseInput,
+    ) -> Result<(), AppError> {
+        let trace = TraceContext::new(request_id);
+        self.service.edit(permission, input, &trace)
+    }
+
+    pub fn upload_release_asset(
+        &self,
+        request_id: &str,
+        permission: RepoPermission,
+        input: &UploadReleaseAssetInput,
+    ) -> Result<(), AppError> {
+        let trace = TraceContext::new(request_id);
+        self.service.upload_asset(permission, input, &trace)
+    }
+
+    pub fn delete_release_asset(
+        &self,
+        request_id: &str,
+        permission: RepoPermission,
+        input: &DeleteReleaseAssetInput,
+    ) -> Result<(), AppError> {
+        let trace = TraceContext::new(request_id);
+        self.service.delete_asset(permission, input, &trace)
     }
 }

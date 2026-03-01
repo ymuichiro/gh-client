@@ -16,12 +16,12 @@
 - releases feature（完了）
 - 目標: CI/CD と配布操作を backend で完結
 
-## Phase 3: Admin Core（進行中）
-- settings feature（collaborators: 完了 / secrets/webhooks/protection: 未着手）
+## Phase 3: Admin Core（完了）
+- settings feature（collaborators / secrets / variables / webhooks / branch protection / deploy keys / dependabot alerts）
 - 目標: 管理系機能を安全な権限制御付きで提供
 
-## Phase 4: Integration Hardening
-- cross-feature E2E
+## Phase 4: Integration Hardening（進行中）
+- cross-feature E2E（完了）
 - レート制限・ネットワーク障害・`gh` 差分への耐性確認
 - セキュリティ検査を CI で常時グリーン化
 

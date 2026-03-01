@@ -3,7 +3,7 @@ use crate::core::executor::Runner;
 use crate::core::observability::TraceContext;
 use crate::core::policy_guard::RepoPermission;
 
-use super::dto::{RunSummary, WorkflowSummary};
+use super::dto::{RunDetail, RunSummary, WorkflowSummary};
 use super::service::{ActionsService, RunActionInput};
 
 pub struct ActionsCommandHandler<R: Runner> {
@@ -56,5 +56,27 @@ impl<R: Runner> ActionsCommandHandler<R> {
     ) -> Result<(), AppError> {
         let trace = TraceContext::new(request_id);
         self.service.cancel(permission, input, &trace)
+    }
+
+    pub fn view_run(
+        &self,
+        request_id: &str,
+        owner: &str,
+        repo: &str,
+        run_id: u64,
+    ) -> Result<RunDetail, AppError> {
+        let trace = TraceContext::new(request_id);
+        self.service.view_run(owner, repo, run_id, &trace)
+    }
+
+    pub fn view_run_logs(
+        &self,
+        request_id: &str,
+        owner: &str,
+        repo: &str,
+        run_id: u64,
+    ) -> Result<String, AppError> {
+        let trace = TraceContext::new(request_id);
+        self.service.view_run_logs(owner, repo, run_id, &trace)
     }
 }

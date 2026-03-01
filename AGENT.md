@@ -13,7 +13,7 @@
 - 重大な設計判断、失敗、仕様差分の発見は必ず記録する。
 - 次アクションが変わる変更をしたら `TODO.md` と `ROADMAP.md` を更新する。
 
-## 現在の実装スナップショット（2026-02-28）
+## 現在の実装スナップショット（2026-03-01）
 - Rust workspace を構成済み（root workspace + `src-tauri` crate）。
 - `core` 実装済み:
   - `CommandRegistry`
@@ -22,57 +22,69 @@
   - `TraceContext` / `AuditEvent`
   - `AppError` / `ErrorCode`
 - `features/repositories` 実装済み:
-  - list/create/delete service
+  - list/create/edit/delete service
+  - branch list/create/delete
+  - commit list
   - command handler
   - DTO parse
   - unit tests
-  - live test (`gh repo list`)
+  - live test (`gh repo list`, branch/commit list via E2E)
 - `features/pull_requests` 実装済み:
-  - list/create/review/merge service
+  - list/create/edit/close/reopen/review/merge service
   - command handler
   - DTO parse
   - unit tests
   - live test (`gh pr list`)
 - `features/issues` 実装済み:
-  - list/create/comment/close/reopen service
+  - list/create/edit/comment/close/reopen service
   - command handler
   - DTO parse
   - unit tests
   - live test (`gh issue list`)
 - `features/actions` 実装済み:
-  - workflow list / run list / rerun / cancel service
+  - workflow list / run list / run detail / run logs / rerun / cancel service
   - command handler
   - DTO parse
   - unit tests
-  - live test (`gh workflow list`, `gh run list`)
+  - live test (`gh workflow list`, `gh run list`, run detail/logs via E2E)
 - `features/releases` 実装済み:
-  - list/create/delete service
+  - list/create/edit/delete service
+  - asset upload/delete
   - command handler
   - DTO parse
   - unit tests
   - live test (`gh release list`)
 - `features/settings` 実装済み:
-  - collaborators list/add/remove service
+  - collaborators list/add/remove
+  - secrets list/set/delete
+  - variables list/set/delete
+  - webhooks list/create/ping/delete
+  - branch protection get/update（update は get 結果を併合して PUT）
+  - deploy keys list/add/delete
+  - dependabot alerts list
   - command handler
   - DTO parse
   - unit tests
-  - live test (`gh api repos/{owner}/{repo}/collaborators`)
+  - live test（collaborators/secrets/variables/webhooks/deploy keys の read 系）
+- cross-feature E2E 実装済み:
+  - `repositories` / `pull_requests` / `issues` / `actions` / `releases` / `settings` の read-only 実操作を 1 本で検証
 
 ## 既知の仕様メモ
 - `gh repo list` は `--owner` フラグではなく owner を位置引数で渡す。
 - `gh workflow list --json` は workflow がない repo で空文字を返す場合がある。
+- `gh pr create --json` は利用できないため、`gh api repos/{owner}/{repo}/pulls` を使用する。
+- destructive command は `CommandRegistry` の `CommandSafety::Destructive` で定義し、`SAFE_TEST_MODE=true` 時に no-op となる。
 - live test は環境変数で制御する。
 
 ## テスト実行コマンド
 - 全テスト:
   - `cargo test`
-- 実操作テスト（全 feature list 系）:
-  - `GH_TEST_OWNER=$(gh api user --jq .login) GH_TEST_REPO=$(gh repo list $(gh api user --jq .login) --json name --limit 1 --jq '.[0].name') GH_CLIENT_LIVE_TEST=1 cargo test --test repositories_live --test pull_requests_live --test issues_live --test actions_live --test releases_live --test settings_live -- --nocapture`
+- 実操作テスト（feature live + cross-feature E2E）:
+  - `OWNER=$(gh api user --jq .login) REPO=$(gh repo list "$OWNER" --json name --limit 1 --jq '.[0].name') GH_CLIENT_LIVE_TEST=1 GH_TEST_OWNER="$OWNER" GH_TEST_REPO="$REPO" cargo test --test repositories_live --test pull_requests_live --test issues_live --test actions_live --test releases_live --test settings_live --test e2e_live -- --nocapture`
 
 ## 次の実装順序
-1. cross-feature E2E の整備
-2. security CI（`cargo audit`, `cargo deny`）
-3. frontend attach
+1. security CI（`cargo audit`, `cargo deny`）
+2. frontend attach（backend contract を薄く接続）
 
 ## 記録ファイル
 - 履歴: `docs/memory/YYYY-MM-DD-*.md`
