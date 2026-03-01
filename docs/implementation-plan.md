@@ -10,7 +10,7 @@
 - Phase A: 完了
 - Phase B: 完了（P0/P1 + P2 の backend module 実装済み）
 - Phase C: 完了（cross-feature E2E / resilience / security CI）
-- Phase D: 未着手（次フェーズ）
+- Phase D: 完了（Tauri + React frontend attach + Playwright E2E）
 
 ## 開発フェーズ
 1. Phase A: Core Foundation（最優先）
@@ -40,12 +40,14 @@
 - E2E 主要導線（PR 作成->レビュー->マージ、Issue 運用、Actions rerun、Release 作成）が成功
 - Security CI (`cargo audit`, `cargo deny`) と権限回避テストが常時グリーン
 
-4. Phase D: Frontend Implementation（後付け / 次フェーズ）
+4. Phase D: Frontend Implementation（後付け / 完了）
 - バックエンド API/command 契約に従って UI を実装
 - UI 側ロジックは薄く保ち、業務ロジックは追加しない
 
 完了条件:
 - 既存バックエンドテストを壊さずに UI から全主要機能を操作可能
+- 全 stable command に GUI から到達可能
+- Playwright E2E（mock/live）を通過
 
 ## 実装単位（feature-based）
 - `src-tauri/src/features/{feature}/command.rs`

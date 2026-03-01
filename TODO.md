@@ -25,5 +25,7 @@
 - [x] レート制限/ネットワーク障害時の再試行・エラー分類を executor に実装する。
 
 ## Upcoming (Frontend)
-- [ ] Tauri アプリの最小起動構成（`cargo tauri dev`）を追加する。
-- [ ] payload contract v2 に沿った UI <-> backend 接続層を実装する。
+- [x] Tauri アプリの最小起動構成（`cargo tauri dev`）を追加する。
+- [x] payload contract v2 に沿った UI <-> backend 接続層を実装する。
+- [x] 全 `STABLE_COMMAND_IDS` を GUI 到達可能（feature page + command console）にする。
+- [x] Playwright E2E（mock read / live read / live write opt-in）を追加する。

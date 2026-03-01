@@ -26,6 +26,14 @@
 - レート制限・ネットワーク障害への再試行/分類（完了）
 - セキュリティ検査 CI（`cargo audit`, `cargo deny`）常時実行（完了）
 
-## Phase 5: Frontend Attach（次フェーズ）
+## Phase 5: Frontend Attach（完了）
 - backend 契約に追従する UI 実装
 - UI は薄い層に限定し、業務ロジックを持たせない
+- Tauri IPC 入口 `frontend_execute` を追加
+- React UI（feature pages + command console）実装
+- Playwright E2E（mock/live）実装
+
+## Phase 6: Productization（次フェーズ）
+- 配布向け署名/バンドル最適化
+- UI/UX の段階的改善（差分閲覧体験、長時間操作の進捗表現）
+- live E2E の nightly 自動運用

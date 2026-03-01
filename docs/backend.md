@@ -29,6 +29,11 @@
 - 長時間処理（ログ取得、大量同期）を非同期ジョブ化
 - 進捗とキャンセル API を提供
 
+6. Frontend IPC Adapter
+- Tauri command `frontend_execute` を唯一入口として `FrontendCommandEnvelope` を受け取る
+- 内部で `FrontendDispatcher` を呼び出し、`serde_json::Value` を返却
+- 失敗時は `FrontendInvokeError`（code/message/retryable/fingerprint/request_id/command_id）に正規化する
+
 ## 推奨ディレクトリ構成（feature-based）
 ```text
 src-tauri/

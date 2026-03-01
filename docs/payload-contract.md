@@ -23,6 +23,26 @@
 }
 ```
 
+## Tauri IPC 入口
+- command 名: `frontend_execute`
+- Rust 署名:
+  - `frontend_execute(envelope: FrontendCommandEnvelope) -> Result<serde_json::Value, FrontendInvokeError>`
+- 実装:
+  - `src-tauri/src/desktop/mod.rs`
+  - `src-tauri/src/app_ipc.rs`
+
+### エラー返却
+```json
+{
+  "code": "permission_denied",
+  "message": "human readable message",
+  "retryable": false,
+  "fingerprint": "abcd1234",
+  "request_id": "req-123",
+  "command_id": "settings.collaborators.list"
+}
+```
+
 ## 認証モデル
 - アプリは GitHub token を payload として受け取らない。
 - 認証状態確認は `auth.status`（`gh auth status` の薄いラッパー）で行う。
@@ -54,3 +74,4 @@
 ## 実装参照
 - コード: `src-tauri/src/contract/mod.rs`
 - 検証テスト: `contract::tests::stable_contract_matches_default_registry`
+- frontend catalog: `ui/src/core/commandCatalog.ts`

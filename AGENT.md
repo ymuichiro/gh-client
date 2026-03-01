@@ -123,10 +123,19 @@
   - `cargo deny check advisories bans licenses sources`
 
 ## 次の実装順序
-1. frontend attach（payload contract v1 に沿った UI 接続）
-2. GUI 操作の E2E（Playwright）を追加
+1. 配布向け productization（署名/バンドル最適化）
+2. UI/UX 改善（差分閲覧・長時間処理表示）
+3. live E2E の nightly 自動運用
 
 ## 記録ファイル
 - 履歴: `docs/memory/YYYY-MM-DD-*.md`
 - TODO: `TODO.md`
 - 中期計画: `ROADMAP.md`
+- frontend attach 実装済み:
+  - `src-tauri` に Tauri 実行基盤を追加（`frontend_execute` command）
+  - `ui/` に React + TypeScript GUI を追加
+  - 全 `STABLE_COMMAND_IDS` を feature page + command console で到達可能化
+  - 破壊系 2段階確認モーダル
+  - 日英切替（JA/EN）
+  - 操作履歴（localStorage）
+  - Playwright E2E（mock read / live read / live write opt-in）
