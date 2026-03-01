@@ -18,7 +18,7 @@ pub trait Runner: Send + Sync {
     fn run(&self, program: &str, args: &[String]) -> io::Result<RawExecutionOutput>;
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct ProcessRunner;
 
 impl Runner for ProcessRunner {

@@ -8,6 +8,7 @@
 
 ## Phase 1: Collaboration Core（完了）
 - pull_requests feature（完了）
+- pull_requests chat/diff 拡張（comments/review_threads/resolve/unresolve/diff files/raw）（完了）
 - issues feature（完了）
 - 目標: 日常開発で必要な操作を backend で完結
 

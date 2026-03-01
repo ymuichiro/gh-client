@@ -29,7 +29,7 @@
 ## 実装状況（バックエンド）
 - `auth`: `gh auth status` の参照（ログイン状態/アカウント/scope を返す）
 - `repositories`: list/create/edit/delete, branch list/create/delete, commit list
-- `pull_requests`: list/create/edit/close/reopen/review/merge
+- `pull_requests`: list/view/create/edit/close/reopen/review/merge, issue/review comment list/create/reply, review thread list/resolve/unresolve, diff files/raw diff
 - `issues`: list/create/edit/comment/close/reopen
 - `actions`: workflow list/run list/run detail/run logs/rerun/cancel
 - `releases`: list/create/edit/delete, asset upload/delete
@@ -86,6 +86,20 @@ cargo test \
   --test e2e_live \
   --test p2_live \
   -- --nocapture
+```
+
+write 系 live テスト（PR コメント投稿/返信/resolve/unresolve）を含める場合:
+
+```bash
+GH_CLIENT_LIVE_TEST=1 \
+GH_CLIENT_LIVE_WRITE_TEST=1 \
+GH_TEST_OWNER="$OWNER" \
+GH_TEST_REPO="$REPO" \
+# 返信テストを実行する場合に指定（任意）
+GH_TEST_REVIEW_COMMENT_ID="<review_comment_id>" \
+# resolve/unresolve の対象を固定したい場合に指定（任意）
+GH_TEST_REVIEW_THREAD_ID="<review_thread_id>" \
+cargo test --test pull_requests_live -- --nocapture
 ```
 
 ### 3. feature 単位でライブテストを実行
