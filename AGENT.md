@@ -23,6 +23,10 @@
   - `PolicyGuard`
   - `TraceContext` / `AuditEvent`
   - `AppError` / `ErrorCode`
+- `features/auth` 実装済み:
+  - `gh auth status` の薄いラッパー
+  - token 非保持でログイン状態/アカウント/scope を返す
+  - unit tests
 - `features/repositories` 実装済み:
   - list/create/edit/delete service
   - branch list/create/delete
@@ -106,6 +110,7 @@
 - `gh pr create --json` は利用できないため、`gh api repos/{owner}/{repo}/pulls` を使用する。
 - destructive command は `CommandRegistry` の `CommandSafety::Destructive` で定義し、`SAFE_TEST_MODE=true` 時に no-op となる。
 - GraphQL の `projectsV2` は token に `read:project` scope が必要。
+- 本アプリは token を保持せず、認証は `gh auth login` セッションに依存する。
 - live test は環境変数で制御する。
 
 ## テスト実行コマンド

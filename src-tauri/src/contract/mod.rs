@@ -12,6 +12,7 @@ pub const STABLE_COMMAND_IDS: &[&str] = &[
     "discussions.close",
     "discussions.create",
     "discussions.list",
+    "auth.status",
     "insights.clones.get",
     "insights.views.get",
     "issue.close",

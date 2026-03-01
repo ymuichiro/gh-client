@@ -6,6 +6,7 @@
 - GitHub 操作を GUI で統合し、CLI に不慣れでも管理操作を完結できるようにする
 - `gh` と `gh api` を第一選択にし、必要に応じて `git` コマンドを併用する
 - GitHub UI の主要機能を、自分が管理するリポジトリ向けに段階的に網羅する
+- アプリ自身は認証情報を保持せず、ローカル `gh auth login` セッションに依存する
 
 ## ドキュメント
 - [機能リスト / GitHub UI 対応表](docs/features.md)
@@ -26,6 +27,7 @@
 - バックエンドを feature-based に先行完成し、フロントエンドは後付け実装する
 
 ## 実装状況（バックエンド）
+- `auth`: `gh auth status` の参照（ログイン状態/アカウント/scope を返す）
 - `repositories`: list/create/edit/delete, branch list/create/delete, commit list
 - `pull_requests`: list/create/edit/close/reopen/review/merge
 - `issues`: list/create/edit/comment/close/reopen
@@ -93,3 +95,4 @@ GH_CLIENT_LIVE_TEST=1 GH_TEST_OWNER="<owner>" GH_TEST_REPO="<repo>" cargo test -
 
 ## 補足（安全性）
 - 破壊系コマンドは `SAFE_TEST_MODE=true` のとき no-op になります（テスト時の安全措置）。
+- 認証は `gh` に依存し、このアプリは GitHub token を保存・管理しません。

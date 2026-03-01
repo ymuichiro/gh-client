@@ -56,6 +56,15 @@ impl CommandRegistry {
         let mut registry = Self::new();
         registry
             .register(CommandSpec::new(
+                "auth.status",
+                "gh",
+                &["auth", "status"],
+                CommandSafety::NonDestructive,
+            ))
+            .expect("default command should register");
+
+        registry
+            .register(CommandSpec::new(
                 "repo.list",
                 "gh",
                 &[
@@ -825,7 +834,7 @@ mod tests {
     #[test]
     fn default_registry_contains_expected_commands() {
         let registry = CommandRegistry::with_defaults();
-        assert_eq!(registry.len(), 75);
+        assert_eq!(registry.len(), 76);
     }
 
     #[test]

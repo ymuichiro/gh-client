@@ -3,6 +3,7 @@
 ## 目的
 - フロントエンドとバックエンド間の IPC/command payload を固定化し、互換性の崩れをテストで検知できるようにする。
 - 本契約は `src-tauri/src/contract/mod.rs` でコード化され、単体テストで registry と整合検証される。
+- 認証は `gh auth login` セッションを前提とし、アプリ側で token を扱わない。
 
 ## バージョン
 - 契約バージョン: `2026-03-01.v1`
@@ -21,6 +22,11 @@
   }
 }
 ```
+
+## 認証モデル
+- アプリは GitHub token を payload として受け取らない。
+- 認証状態確認は `auth.status`（`gh auth status` の薄いラッパー）で行う。
+- 未ログイン時は `AuthRequired` として扱い、GUI から `gh auth login` を案内する。
 
 ### フィールド
 - `contract_version`: 必須。現在は `2026-03-01.v1` のみ受け付ける。

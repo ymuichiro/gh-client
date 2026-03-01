@@ -1,4 +1,5 @@
 pub mod actions;
+pub mod auth;
 pub mod discussions;
 pub mod insights;
 pub mod issues;

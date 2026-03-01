@@ -3,11 +3,13 @@
 ## 目的
 - GUI からの操作を GitHub に安全かつ一貫した方式で反映する
 - `gh` の使いやすさを活かしつつ、UI で扱いやすい API/エラーへ変換する
+- アプリ側は token を保持せず、ローカル `gh auth login` セッションに依存する
 
 ## コンポーネント
 1. Command Registry
 - 実行可能コマンドを宣言的に定義
 - 入力スキーマ（必須/型/制約）を保持
+- `auth.status` を通じて認証状態を参照
 
 2. Executor
 - `std::process::Command` で引数配列実行（shell 展開禁止）
