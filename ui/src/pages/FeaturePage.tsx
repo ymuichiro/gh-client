@@ -27,6 +27,7 @@ export function FeaturePage({ route, title, description, ...rest }: FeaturePageP
       owner={rest.owner}
       repo={rest.repo}
       repoPermission={rest.repoPermission}
+      selectionOptions={rest.selectionOptions}
       onExecuted={rest.onExecuted}
       onInspect={rest.onInspect}
     />

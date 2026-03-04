@@ -12,6 +12,12 @@ pub struct GhAuthStatus {
     pub token_scopes: Vec<String>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct GhOrganization {
+    pub login: String,
+    pub name: Option<String>,
+}
+
 impl GhAuthStatus {
     pub fn logged_out_default(host: impl Into<String>) -> Self {
         Self {
@@ -119,6 +125,53 @@ pub fn parse_gh_auth_status(payload: &str) -> Result<GhAuthStatus, AppError> {
     })
 }
 
+#[derive(Debug, Deserialize)]
+struct GhOrganizationApi {
+    login: String,
+    name: Option<String>,
+}
+
+pub fn parse_gh_organizations(payload: &str) -> Result<Vec<GhOrganization>, AppError> {
+    let trimmed = payload.trim();
+    if trimmed.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let parsed: Vec<GhOrganizationApi> = serde_json::from_str(trimmed).map_err(|err| {
+        AppError::new(
+            ErrorCode::UpstreamError,
+            format!("failed to parse gh organizations payload: {}", err),
+            false,
+        )
+    })?;
+
+    let mut organizations = parsed
+        .into_iter()
+        .filter_map(|item| {
+            let login = item.login.trim().to_string();
+            if login.is_empty() {
+                return None;
+            }
+
+            let name = item.name.and_then(|value| {
+                let normalized = value.trim().to_string();
+                if normalized.is_empty() {
+                    None
+                } else {
+                    Some(normalized)
+                }
+            });
+
+            Some(GhOrganization { login, name })
+        })
+        .collect::<Vec<_>>();
+
+    organizations.sort_by(|left, right| left.login.cmp(&right.login));
+    organizations.dedup_by(|left, right| left.login.eq_ignore_ascii_case(&right.login));
+
+    Ok(organizations)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -148,5 +201,27 @@ mod tests {
         assert_eq!(status.host, "github.com");
         assert!(!status.logged_in);
         assert!(status.account.is_none());
+    }
+
+    #[test]
+    fn parses_organizations_payload() {
+        let payload = r#"[
+          {"login":"octo-org","name":"Octo Org"},
+          {"login":"team-aaa","name":null}
+        ]"#;
+
+        let organizations = parse_gh_organizations(payload).expect("payload should parse");
+
+        assert_eq!(organizations.len(), 2);
+        assert_eq!(organizations[0].login, "octo-org");
+        assert_eq!(organizations[0].name.as_deref(), Some("Octo Org"));
+        assert_eq!(organizations[1].login, "team-aaa");
+        assert!(organizations[1].name.is_none());
+    }
+
+    #[test]
+    fn parses_empty_organizations_payload_as_empty() {
+        let organizations = parse_gh_organizations(" \n ").expect("payload should parse");
+        assert!(organizations.is_empty());
     }
 }

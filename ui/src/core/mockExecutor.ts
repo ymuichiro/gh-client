@@ -5,6 +5,12 @@ const mockNow = new Date().toISOString();
 
 export async function executeMockEnvelope(envelope: CommandEnvelope): Promise<unknown> {
   switch (envelope.command_id) {
+    case "auth.organizations.list":
+      return [
+        { login: "mock-org", name: "Mock Organization" },
+        { login: "sandbox-team", name: "Sandbox Team" },
+      ];
+
     case "auth.status":
       return {
         logged_in: true,

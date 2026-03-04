@@ -3,7 +3,7 @@ use crate::core::error::ErrorCode;
 use crate::core::executor::{CommandExecutor, Runner};
 use crate::core::observability::TraceContext;
 
-use super::dto::{GhAuthStatus, parse_gh_auth_status};
+use super::dto::{GhAuthStatus, GhOrganization, parse_gh_auth_status, parse_gh_organizations};
 
 pub struct AuthService<R: Runner> {
     registry: CommandRegistry,
@@ -28,6 +28,21 @@ impl<R: Runner> AuthService<R> {
             Err(err) if err.code == ErrorCode::AuthRequired => {
                 Ok(GhAuthStatus::logged_out_default("github.com"))
             }
+            Err(err) => Err(err),
+        }
+    }
+
+    pub fn list_organizations(
+        &self,
+        trace: &TraceContext,
+    ) -> Result<Vec<GhOrganization>, crate::core::error::AppError> {
+        let req = self
+            .registry
+            .build_request("auth.organizations.list", &[])?;
+
+        match self.executor.execute(&req, trace) {
+            Ok((output, _audit)) => parse_gh_organizations(&output.stdout),
+            Err(err) if err.code == ErrorCode::AuthRequired => Ok(Vec::new()),
             Err(err) => Err(err),
         }
     }
@@ -144,5 +159,50 @@ mod tests {
             .expect("status should map to logged out");
         assert!(!status.logged_in);
         assert_eq!(state.call_count(), 1);
+    }
+
+    #[test]
+    fn list_organizations_executes_gh_api_and_parses_payload() {
+        let output = RawExecutionOutput {
+            exit_code: 0,
+            stdout: r#"[{"login":"octo-org","name":"Octo Org"}]"#.into(),
+            stderr: String::new(),
+        };
+
+        let (runner, state) = RecordingRunner::new(vec![output]);
+        let service = AuthService::new(
+            CommandRegistry::with_defaults(),
+            CommandExecutor::new(runner, false),
+        );
+
+        let organizations = service
+            .list_organizations(&trace())
+            .expect("organizations should parse");
+        assert_eq!(organizations.len(), 1);
+        assert_eq!(organizations[0].login, "octo-org");
+
+        let (_program, args) = state.last_call().expect("command should be called");
+        assert_eq!(args[0], "api");
+        assert_eq!(args[1], "user/orgs?per_page=100");
+    }
+
+    #[test]
+    fn list_organizations_returns_empty_when_not_authenticated() {
+        let output = RawExecutionOutput {
+            exit_code: 1,
+            stdout: String::new(),
+            stderr: "run gh auth login to authenticate".into(),
+        };
+
+        let (runner, _state) = RecordingRunner::new(vec![output]);
+        let service = AuthService::new(
+            CommandRegistry::with_defaults(),
+            CommandExecutor::new(runner, false),
+        );
+
+        let organizations = service
+            .list_organizations(&trace())
+            .expect("status should map to empty organizations");
+        assert!(organizations.is_empty());
     }
 }

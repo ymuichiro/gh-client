@@ -2,7 +2,7 @@ use crate::core::error::AppError;
 use crate::core::executor::Runner;
 use crate::core::observability::TraceContext;
 
-use super::dto::GhAuthStatus;
+use super::dto::{GhAuthStatus, GhOrganization};
 use super::service::AuthService;
 
 pub struct AuthCommandHandler<R: Runner> {
@@ -17,5 +17,10 @@ impl<R: Runner> AuthCommandHandler<R> {
     pub fn status(&self, request_id: &str) -> Result<GhAuthStatus, AppError> {
         let trace = TraceContext::new(request_id);
         self.service.status(&trace)
+    }
+
+    pub fn organizations_list(&self, request_id: &str) -> Result<Vec<GhOrganization>, AppError> {
+        let trace = TraceContext::new(request_id);
+        self.service.list_organizations(&trace)
     }
 }

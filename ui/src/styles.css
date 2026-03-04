@@ -114,7 +114,7 @@ p {
 .context-grid {
   display: grid;
   gap: 8px;
-  grid-template-columns: repeat(2, minmax(220px, 1fr));
+  grid-template-columns: repeat(4, minmax(180px, 1fr));
 }
 
 .context-grid label {
@@ -122,6 +122,11 @@ p {
   gap: 4px;
   font-size: 0.87rem;
   color: var(--text-subtle);
+}
+
+.context-refresh {
+  align-self: end;
+  height: 38px;
 }
 
 .status-row {

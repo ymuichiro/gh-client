@@ -85,3 +85,13 @@ export interface RepoContext {
   repo: string;
   viewerPermission?: string;
 }
+
+export interface CommandSelectionOptions {
+  ownerOptions: string[];
+  repoOptions: string[];
+  branchOptions: string[];
+  pullRequestNumberOptions: number[];
+  issueNumberOptions: number[];
+  runIdOptions: number[];
+  releaseTagOptions: string[];
+}

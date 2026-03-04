@@ -27,7 +27,7 @@
 - バックエンドを feature-based に先行完成し、フロントエンドは後付け実装する
 
 ## 実装状況（バックエンド + フロントエンド）
-- `auth`: `gh auth status` の参照（ログイン状態/アカウント/scope を返す）
+- `auth`: `gh auth status` の参照（ログイン状態/アカウント/scope）+ `gh api user/orgs` による organization 一覧取得
 - `repositories`: list/create/edit/delete, branch list/create/delete, commit list
 - `pull_requests`: list/view/create/edit/close/reopen/review/merge, issue/review comment list/create/reply, review thread list/resolve/unresolve, diff files/raw diff
 - `issues`: list/create/edit/comment/close/reopen
@@ -47,6 +47,8 @@
 - UI 言語: 日本語/英語の切替
 - 破壊系操作: 2段階確認モーダル
 - 実行履歴: ローカル監査ログ（request_id / command_id / status）
+- repo context: owner/repo は手入力ではなく選択式（organization/repository 候補を `gh` から取得）
+- 動的選択: branch/tag/PR番号/Issue番号/run_id は可能な範囲で候補選択に対応
 
 ## ローカル起動
 

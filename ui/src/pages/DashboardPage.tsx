@@ -16,6 +16,7 @@ export function DashboardPage({
   owner,
   repo,
   repoPermission,
+  selectionOptions,
   onExecuted,
   onInspect,
   onAuthStateChange,
@@ -133,6 +134,7 @@ export function DashboardPage({
         owner={owner}
         repo={repo}
         repoPermission={repoPermission}
+        selectionOptions={selectionOptions}
         onExecuted={onExecuted}
         onInspect={onInspect}
       />

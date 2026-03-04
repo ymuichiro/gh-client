@@ -62,6 +62,14 @@ impl CommandRegistry {
                 CommandSafety::NonDestructive,
             ))
             .expect("default command should register");
+        registry
+            .register(CommandSpec::new(
+                "auth.organizations.list",
+                "gh",
+                &["api", "user/orgs?per_page=100"],
+                CommandSafety::NonDestructive,
+            ))
+            .expect("default command should register");
 
         registry
             .register(CommandSpec::new(
@@ -938,7 +946,7 @@ mod tests {
     #[test]
     fn default_registry_contains_expected_commands() {
         let registry = CommandRegistry::with_defaults();
-        assert_eq!(registry.len(), 87);
+        assert_eq!(registry.len(), 88);
     }
 
     #[test]

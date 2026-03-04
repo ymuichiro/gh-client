@@ -1,4 +1,4 @@
-# Frontend Payload Contract (v2)
+# Frontend Payload Contract (v3)
 
 ## 目的
 - フロントエンドとバックエンド間の IPC/command payload を固定化し、互換性の崩れをテストで検知できるようにする。
@@ -6,13 +6,13 @@
 - 認証は `gh auth login` セッションを前提とし、アプリ側で token を扱わない。
 
 ## バージョン
-- 契約バージョン: `2026-03-01.v2`
+- 契約バージョン: `2026-03-04.v3`
 - 定義定数: `PAYLOAD_CONTRACT_VERSION`
 
 ## リクエスト envelope
 ```json
 {
-  "contract_version": "2026-03-01.v2",
+  "contract_version": "2026-03-04.v3",
   "request_id": "req-123",
   "command_id": "repo.list",
   "permission": "viewer",
@@ -55,8 +55,11 @@
 - `pr.review_threads.list`, `pr.review_threads.resolve`, `pr.review_threads.unresolve`
 - `pr.diff.files.list`, `pr.diff.raw.get`
 
+## v3 で追加した command
+- `auth.organizations.list`
+
 ### フィールド
-- `contract_version`: 必須。現在は `2026-03-01.v2` のみ受け付ける。
+- `contract_version`: 必須。現在は `2026-03-04.v3` のみ受け付ける。
 - `request_id`: 必須。空文字不可。
 - `command_id`: 必須。安定契約に含まれる command id のみ許可。
 - `permission`: 任意。`viewer | write | admin`。

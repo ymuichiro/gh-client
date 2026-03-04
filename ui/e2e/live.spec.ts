@@ -77,9 +77,16 @@ test.describe("@live frontend live flow", () => {
 
 async function setContext(page: Page, owner: string, repo: string, permission: "viewer" | "write" | "admin") {
   const context = page.locator(".context-grid");
-  await context.locator("input").nth(0).fill(owner);
-  await context.locator("input").nth(1).fill(repo);
-  await context.locator("select").first().selectOption(permission);
+  const ownerSelect = context.locator("select[data-context=\"owner\"]");
+  const repoSelect = context.locator("select[data-context=\"repo\"]");
+  const permissionSelect = context.locator("select[data-context=\"permission\"]");
+
+  await expect(ownerSelect).toBeVisible();
+  await expect.poll(async () => ownerSelect.locator("option").count()).toBeGreaterThan(1);
+
+  await ownerSelect.selectOption(owner);
+  await repoSelect.selectOption(repo);
+  await permissionSelect.selectOption(permission);
 }
 
 async function runCommand(

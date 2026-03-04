@@ -1,6 +1,6 @@
 import { COMMAND_CATALOG } from "../core/commandCatalog";
 import type { CommandId, } from "../core/commandIds";
-import type { CommandPermission } from "../core/types";
+import type { CommandPermission, CommandSelectionOptions } from "../core/types";
 import { CommandForm, type CommandExecutionEvent } from "./CommandForm";
 
 interface CommandBoardProps {
@@ -10,6 +10,7 @@ interface CommandBoardProps {
   owner: string;
   repo: string;
   repoPermission: CommandPermission | null;
+  selectionOptions: CommandSelectionOptions;
   onExecuted: (event: CommandExecutionEvent) => void;
   onInspect: (title: string, value: unknown) => void;
 }
@@ -21,6 +22,7 @@ export function CommandBoard({
   owner,
   repo,
   repoPermission,
+  selectionOptions,
   onExecuted,
   onInspect,
 }: CommandBoardProps): JSX.Element {
@@ -39,6 +41,7 @@ export function CommandBoard({
             owner={owner}
             repo={repo}
             repoPermission={repoPermission}
+            selectionOptions={selectionOptions}
             onExecuted={onExecuted}
             onInspect={onInspect}
           />

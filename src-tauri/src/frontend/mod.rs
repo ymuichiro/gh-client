@@ -47,6 +47,7 @@ use crate::features::settings::service::{
 use crate::features::wiki::service::{UpdateWikiInput, WikiService};
 
 pub const SUPPORTED_COMMAND_IDS: &[&str] = &[
+    "auth.organizations.list",
     "auth.status",
     "repo.list",
     "repo.create",
@@ -182,6 +183,13 @@ impl<R: Runner + Clone> FrontendDispatcher<R> {
             "auth.status" => {
                 let status = self.auth_service().status(&TraceContext::new(request_id))?;
                 to_json(status)
+            }
+            "auth.organizations.list" => {
+                let _: serde_json::Map<String, Value> = parse_payload(payload)?;
+                let organizations = self
+                    .auth_service()
+                    .list_organizations(&TraceContext::new(request_id))?;
+                to_json(organizations)
             }
 
             "repo.list" => {
@@ -2039,6 +2047,28 @@ mod tests {
         let (_program, args) = state.last_call().expect("command should be called");
         assert_eq!(args[0], "auth");
         assert_eq!(args[1], "status");
+    }
+
+    #[test]
+    fn dispatches_auth_organizations_list() {
+        let (runner, state) = RecordingRunner::new(vec![RawExecutionOutput {
+            exit_code: 0,
+            stdout: r#"[{"login":"octo-org","name":"Octo Org"}]"#.into(),
+            stderr: String::new(),
+        }]);
+
+        let dispatcher =
+            FrontendDispatcher::new(runner, false).expect("dispatcher should initialize");
+
+        let value = dispatcher
+            .execute_envelope(envelope("auth.organizations.list", json!({})))
+            .expect("dispatch should succeed");
+
+        assert_eq!(value[0]["login"], json!("octo-org"));
+
+        let (_program, args) = state.last_call().expect("command should be called");
+        assert_eq!(args[0], "api");
+        assert_eq!(args[1], "user/orgs?per_page=100");
     }
 
     #[test]

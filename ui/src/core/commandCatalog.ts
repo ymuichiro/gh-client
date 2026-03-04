@@ -109,6 +109,7 @@ const payloadAny = z.record(z.any());
 const responseAny = z.any();
 
 const payloadSchemas: Partial<Record<CommandId, z.ZodTypeAny>> = {
+  "auth.organizations.list": z.object({}).passthrough(),
   "auth.status": z.object({}).passthrough(),
   "repo.list": z
     .object({ owner: z.string().min(1), limit: z.number().int().positive().optional() })
@@ -404,6 +405,7 @@ const responseSchemas: Partial<Record<CommandId, z.ZodTypeAny>> = {
 };
 
 const fieldOverrides: Partial<Record<CommandId, CommandField[]>> = {
+  "auth.organizations.list": [],
   "auth.status": [],
   "repo.list": [
     { name: "owner", label: "owner", type: "text", required: true, placeholder: "octocat" },
@@ -736,7 +738,11 @@ const fieldOverrides: Partial<Record<CommandId, CommandField[]>> = {
 };
 
 function inferCategory(id: CommandId): CommandCategory {
-  if (id === "auth.status" || id === "repo.list") {
+  if (
+    id === "auth.organizations.list" ||
+    id === "auth.status" ||
+    id === "repo.list"
+  ) {
     return "dashboard";
   }
 
@@ -791,7 +797,7 @@ function inferPermission(id: CommandId): CommandPermission {
 }
 
 function inferNeedsRepoContext(id: CommandId): boolean {
-  if (id === "auth.status") {
+  if (id === "auth.organizations.list" || id === "auth.status") {
     return false;
   }
 

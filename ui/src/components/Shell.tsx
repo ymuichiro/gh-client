@@ -7,6 +7,11 @@ import { LanguageSwitch } from "./LanguageSwitch";
 interface ShellProps extends PropsWithChildren {
   owner: string;
   repo: string;
+  ownerOptions: string[];
+  repoOptions: string[];
+  contextLoading: boolean;
+  contextError: string | null;
+  onRefreshContext: () => void;
   onOwnerChange: (value: string) => void;
   onRepoChange: (value: string) => void;
   onRepoPermissionChange: (value: "viewer" | "write" | "admin" | "unknown") => void;
@@ -30,6 +35,11 @@ const navItems = [
 export function Shell({
   owner,
   repo,
+  ownerOptions,
+  repoOptions,
+  contextLoading,
+  contextError,
+  onRefreshContext,
   onOwnerChange,
   onRepoChange,
   onRepoPermissionChange,
@@ -61,16 +71,51 @@ export function Shell({
           <div className="context-grid">
             <label>
               <span>{t("header.owner")}</span>
-              <input className="input" value={owner} onChange={(event) => onOwnerChange(event.target.value)} />
+              <select
+                className="input"
+                data-context="owner"
+                value={owner}
+                disabled={contextLoading || ownerOptions.length === 0}
+                onChange={(event) => onOwnerChange(event.target.value)}
+              >
+                <option value="">
+                  {contextLoading
+                    ? t("context.loading")
+                    : t("context.no_owner_options")}
+                </option>
+                {ownerOptions.map((ownerOption) => (
+                  <option key={ownerOption} value={ownerOption}>
+                    {ownerOption}
+                  </option>
+                ))}
+              </select>
             </label>
             <label>
               <span>{t("header.repo")}</span>
-              <input className="input" value={repo} onChange={(event) => onRepoChange(event.target.value)} />
+              <select
+                className="input"
+                data-context="repo"
+                value={repo}
+                disabled={contextLoading || repoOptions.length === 0}
+                onChange={(event) => onRepoChange(event.target.value)}
+              >
+                <option value="">
+                  {contextLoading
+                    ? t("context.loading")
+                    : t("context.no_repo_options")}
+                </option>
+                {repoOptions.map((repoOption) => (
+                  <option key={repoOption} value={repoOption}>
+                    {repoOption}
+                  </option>
+                ))}
+              </select>
             </label>
             <label>
               <span>{t("header.permission")}</span>
               <select
                 className="input"
+                data-context="permission"
                 value={repoPermission}
                 onChange={(event) =>
                   onRepoPermissionChange(
@@ -84,6 +129,14 @@ export function Shell({
                 <option value="admin">admin</option>
               </select>
             </label>
+            <button
+              type="button"
+              className="btn secondary context-refresh"
+              onClick={onRefreshContext}
+              disabled={contextLoading}
+            >
+              {contextLoading ? t("context.loading") : t("context.refresh")}
+            </button>
           </div>
 
           <div className="status-row">
@@ -93,6 +146,7 @@ export function Shell({
             <div className={authLoggedIn ? "badge success" : "badge danger"}>
               {t("header.auth")}: {authLoggedIn ? t("auth.logged_in") : t("auth.logged_out")}
             </div>
+            {contextError ? <div className="badge danger">{contextError}</div> : null}
             <LanguageSwitch />
           </div>
         </header>

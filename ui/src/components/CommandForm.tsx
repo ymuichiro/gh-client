@@ -8,7 +8,9 @@ import type { CommandId, } from "../core/commandIds";
 import type {
   CommandField,
   CommandPermission,
+  CommandSelectionOptions,
   CommandSpec,
+  FieldOption,
   FrontendInvokeError,
 } from "../core/types";
 
@@ -26,6 +28,7 @@ interface CommandFormProps {
   owner: string;
   repo: string;
   repoPermission: CommandPermission | null;
+  selectionOptions: CommandSelectionOptions;
   onExecuted: (event: CommandExecutionEvent) => void;
   onInspect: (title: string, value: unknown) => void;
 }
@@ -35,6 +38,7 @@ export function CommandForm({
   owner,
   repo,
   repoPermission,
+  selectionOptions,
   onExecuted,
   onInspect,
 }: CommandFormProps): JSX.Element {
@@ -155,7 +159,18 @@ export function CommandForm({
           />
         </label>
       ) : (
-        <div className="field-grid">{spec.fields.map((field) => renderField(field, values[field.name], onChangeField, t))}</div>
+        <div className="field-grid">
+          {spec.fields.map((field) =>
+            renderField(
+              spec,
+              field,
+              values[field.name],
+              onChangeField,
+              selectionOptions,
+              t,
+            ),
+          )}
+        </div>
       )}
 
       {!canExecute ? <p className="warn-text">{t("status.permission_missing")}</p> : null}
@@ -190,11 +205,15 @@ export function CommandForm({
 }
 
 function renderField(
+  spec: CommandSpec,
   field: CommandField,
   value: string | boolean | undefined,
   onChangeField: (field: CommandField, value: string | boolean) => void,
+  selectionOptions: CommandSelectionOptions,
   t: (key: string) => string,
 ): JSX.Element {
+  const dynamicOptions = resolveDynamicOptions(spec, field, selectionOptions);
+
   if (field.type === "boolean") {
     return (
       <label key={field.name} className="checkbox-row">
@@ -209,7 +228,9 @@ function renderField(
     );
   }
 
-  if (field.type === "select") {
+  if (field.type === "select" || dynamicOptions !== null) {
+    const options = field.type === "select" ? (field.options ?? []) : dynamicOptions ?? [];
+
     return (
       <label key={field.name}>
         <span>
@@ -222,7 +243,7 @@ function renderField(
           onChange={(event) => onChangeField(field, event.target.value)}
         >
           <option value="">--</option>
-          {(field.options ?? []).map((option) => (
+          {options.map((option) => (
             <option key={option.value} value={option.value}>
               {option.label}
             </option>
@@ -332,4 +353,54 @@ function buildPayload(
 
 function hasField(fields: CommandField[], name: string): boolean {
   return fields.some((field) => field.name === name);
+}
+
+function resolveDynamicOptions(
+  spec: CommandSpec,
+  field: CommandField,
+  selectionOptions: CommandSelectionOptions,
+): FieldOption[] | null {
+  if (field.name === "owner") {
+    return toStringOptions(selectionOptions.ownerOptions);
+  }
+
+  if (field.name === "repo") {
+    return toStringOptions(selectionOptions.repoOptions);
+  }
+
+  if (
+    field.name === "branch" ||
+    field.name === "from_branch" ||
+    field.name === "base" ||
+    field.name === "default_branch" ||
+    field.name === "target"
+  ) {
+    return toStringOptions(selectionOptions.branchOptions);
+  }
+
+  if (field.name === "tag") {
+    return toStringOptions(selectionOptions.releaseTagOptions);
+  }
+
+  if (field.name === "run_id") {
+    return toNumberOptions(selectionOptions.runIdOptions);
+  }
+
+  if (field.name === "number" && spec.id.startsWith("pr.")) {
+    return toNumberOptions(selectionOptions.pullRequestNumberOptions);
+  }
+
+  if (field.name === "number" && spec.id.startsWith("issue.")) {
+    return toNumberOptions(selectionOptions.issueNumberOptions);
+  }
+
+  return null;
+}
+
+function toStringOptions(values: string[]): FieldOption[] {
+  return values.map((value) => ({ label: value, value }));
+}
+
+function toNumberOptions(values: number[]): FieldOption[] {
+  return values.map((value) => ({ label: String(value), value: String(value) }));
 }
