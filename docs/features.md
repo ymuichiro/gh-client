@@ -21,6 +21,9 @@
 | Pull Requests | 作成（draft含む）/編集/クローズ | P0 | `gh pr create/edit/close` | テンプレート読み込み対応 |
 | Pull Requests | レビュー（approve/request changes/comment） | P0 | `gh pr review` | |
 | Pull Requests | マージ（merge/squash/rebase） | P0 | `gh pr merge` | ブランチ削除オプション |
+| Pull Requests | 会話（全体コメント/行コメント/返信） | P0 | `gh api` | issue comments + review comments を正規化 DTO で提供 |
+| Pull Requests | レビュースレッド管理（list/resolve/unresolve） | P0 | `gh api graphql` | review thread を thread 単位で取得・状態更新 |
+| Pull Requests | Diff 閲覧（構造化ファイル + raw unified） | P0 | `gh api` + `gh pr diff` | `patch` 欠損時は raw diff fallback |
 | Issues | 一覧/検索/詳細表示 | P0 | `gh issue list/view --json` | assignee, labels, milestone |
 | Issues | 作成/編集/コメント/close/reopen | P0 | `gh issue create/edit/comment/reopen/close` | |
 | Actions | Workflow 一覧/Run 一覧/ログ閲覧 | P0 | `gh workflow list` + `gh run list/view` | ログダウンロード |
@@ -50,7 +53,9 @@
 
 3. Pull Request
 - 一覧・詳細・レビュー・マージ
-- 差分表示、チェック結果表示
+- 会話（全体コメント/行コメント/返信）
+- レビュースレッドの resolve / unresolve
+- 差分表示（構造化 files + raw unified）、チェック結果表示
 
 4. Issues
 - 一覧・詳細・コメント

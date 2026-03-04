@@ -1,0 +1,27 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "gh-client",
+  "version": "0.1.0",
+  "identifier": "com.ymuichiro.ghclient",
+  "build": {
+    "beforeDevCommand": "npm --prefix ../ui run dev -- --host 127.0.0.1 --port 5173",
+    "beforeBuildCommand": "npm --prefix ../ui run build",
+    "devUrl": "http://127.0.0.1:5173",
+    "frontendDist": "../ui/dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "gh-client",
+        "width": 1440,
+        "height": 940,
+        "resizable": true,
+        "fullscreen": false
+      }
+    ]
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all"
+  }
+}

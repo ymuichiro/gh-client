@@ -3,10 +3,15 @@ use crate::core::executor::Runner;
 use crate::core::observability::TraceContext;
 use crate::core::policy_guard::RepoPermission;
 
-use super::dto::{PullRequestCreated, PullRequestSummary};
+use super::dto::{
+    PullRequestComment, PullRequestCreated, PullRequestDetail, PullRequestDiffFile,
+    PullRequestRawDiff, PullRequestReviewThread, PullRequestSummary,
+};
 use super::service::{
-    ClosePullRequestInput, CreatePullRequestInput, EditPullRequestInput, MergePullRequestInput,
-    PullRequestsService, ReopenPullRequestInput, ReviewPullRequestInput,
+    ClosePullRequestInput, CommentPullRequestInput, CreatePullRequestInput,
+    CreateReviewCommentInput, EditPullRequestInput, MergePullRequestInput, PullRequestsService,
+    ReopenPullRequestInput, ReplyReviewCommentInput, ResolveReviewThreadInput,
+    ReviewPullRequestInput,
 };
 
 pub struct PullRequestsCommandHandler<R: Runner> {
@@ -27,6 +32,17 @@ impl<R: Runner> PullRequestsCommandHandler<R> {
     ) -> Result<Vec<PullRequestSummary>, AppError> {
         let trace = TraceContext::new(request_id);
         self.service.list(owner, repo, limit, &trace)
+    }
+
+    pub fn view_pull_request(
+        &self,
+        request_id: &str,
+        owner: &str,
+        repo: &str,
+        number: u64,
+    ) -> Result<PullRequestDetail, AppError> {
+        let trace = TraceContext::new(request_id);
+        self.service.view(owner, repo, number, &trace)
     }
 
     pub fn create_pull_request(
@@ -87,5 +103,116 @@ impl<R: Runner> PullRequestsCommandHandler<R> {
     ) -> Result<(), AppError> {
         let trace = TraceContext::new(request_id);
         self.service.reopen(permission, input, &trace)
+    }
+
+    pub fn list_pull_request_comments(
+        &self,
+        request_id: &str,
+        owner: &str,
+        repo: &str,
+        number: u64,
+    ) -> Result<Vec<PullRequestComment>, AppError> {
+        let trace = TraceContext::new(request_id);
+        self.service
+            .list_issue_comments(owner, repo, number, &trace)
+    }
+
+    pub fn create_pull_request_comment(
+        &self,
+        request_id: &str,
+        permission: RepoPermission,
+        input: &CommentPullRequestInput,
+    ) -> Result<PullRequestComment, AppError> {
+        let trace = TraceContext::new(request_id);
+        self.service.create_issue_comment(permission, input, &trace)
+    }
+
+    pub fn list_pull_request_review_comments(
+        &self,
+        request_id: &str,
+        owner: &str,
+        repo: &str,
+        number: u64,
+    ) -> Result<Vec<PullRequestComment>, AppError> {
+        let trace = TraceContext::new(request_id);
+        self.service
+            .list_review_comments(owner, repo, number, &trace)
+    }
+
+    pub fn create_pull_request_review_comment(
+        &self,
+        request_id: &str,
+        permission: RepoPermission,
+        input: &CreateReviewCommentInput,
+    ) -> Result<PullRequestComment, AppError> {
+        let trace = TraceContext::new(request_id);
+        self.service
+            .create_review_comment(permission, input, &trace)
+    }
+
+    pub fn reply_pull_request_review_comment(
+        &self,
+        request_id: &str,
+        permission: RepoPermission,
+        input: &ReplyReviewCommentInput,
+    ) -> Result<PullRequestComment, AppError> {
+        let trace = TraceContext::new(request_id);
+        self.service.reply_review_comment(permission, input, &trace)
+    }
+
+    pub fn list_pull_request_review_threads(
+        &self,
+        request_id: &str,
+        owner: &str,
+        repo: &str,
+        number: u64,
+    ) -> Result<Vec<PullRequestReviewThread>, AppError> {
+        let trace = TraceContext::new(request_id);
+        self.service
+            .list_review_threads(owner, repo, number, &trace)
+    }
+
+    pub fn resolve_pull_request_review_thread(
+        &self,
+        request_id: &str,
+        permission: RepoPermission,
+        input: &ResolveReviewThreadInput,
+    ) -> Result<(), AppError> {
+        let trace = TraceContext::new(request_id);
+        self.service
+            .resolve_review_thread(permission, input, &trace)
+    }
+
+    pub fn unresolve_pull_request_review_thread(
+        &self,
+        request_id: &str,
+        permission: RepoPermission,
+        input: &ResolveReviewThreadInput,
+    ) -> Result<(), AppError> {
+        let trace = TraceContext::new(request_id);
+        self.service
+            .unresolve_review_thread(permission, input, &trace)
+    }
+
+    pub fn list_pull_request_diff_files(
+        &self,
+        request_id: &str,
+        owner: &str,
+        repo: &str,
+        number: u64,
+    ) -> Result<Vec<PullRequestDiffFile>, AppError> {
+        let trace = TraceContext::new(request_id);
+        self.service.list_diff_files(owner, repo, number, &trace)
+    }
+
+    pub fn get_pull_request_raw_diff(
+        &self,
+        request_id: &str,
+        owner: &str,
+        repo: &str,
+        number: u64,
+    ) -> Result<PullRequestRawDiff, AppError> {
+        let trace = TraceContext::new(request_id);
+        self.service.get_raw_diff(owner, repo, number, &trace)
     }
 }

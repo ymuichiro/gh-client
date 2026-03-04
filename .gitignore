@@ -1,1 +1,12 @@
 /target
+ui/node_modules
+ui/dist
+ui/playwright-report
+ui/test-results
+ui/.vite
+ui/playwright.config.js
+ui/playwright.config.d.ts
+ui/vite.config.js
+ui/vite.config.d.ts
+ui/tsconfig.app.tsbuildinfo
+ui/tsconfig.node.tsbuildinfo

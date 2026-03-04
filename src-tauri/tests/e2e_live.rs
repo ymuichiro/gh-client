@@ -89,8 +89,84 @@ fn live_cross_feature_read_only_flow() {
     assert!(
         prs.is_ok(),
         "e2e: pull request list failed: {:?}",
-        prs.err()
+        prs.as_ref().err()
     );
+
+    if let Ok(pr_items) = prs {
+        if let Some(first_pr) = pr_items.first() {
+            let pr_detail = pr_service.view(
+                &owner,
+                &repo,
+                first_pr.number,
+                &TraceContext::new("e2e-pr-view"),
+            );
+            assert!(
+                pr_detail.is_ok(),
+                "e2e: pull request detail failed: {:?}",
+                pr_detail.err()
+            );
+
+            let issue_comments = pr_service.list_issue_comments(
+                &owner,
+                &repo,
+                first_pr.number,
+                &TraceContext::new("e2e-pr-issue-comments"),
+            );
+            assert!(
+                issue_comments.is_ok(),
+                "e2e: pull request issue comments failed: {:?}",
+                issue_comments.err()
+            );
+
+            let review_comments = pr_service.list_review_comments(
+                &owner,
+                &repo,
+                first_pr.number,
+                &TraceContext::new("e2e-pr-review-comments"),
+            );
+            assert!(
+                review_comments.is_ok(),
+                "e2e: pull request review comments failed: {:?}",
+                review_comments.err()
+            );
+
+            let review_threads = pr_service.list_review_threads(
+                &owner,
+                &repo,
+                first_pr.number,
+                &TraceContext::new("e2e-pr-review-threads"),
+            );
+            assert!(
+                review_threads.is_ok(),
+                "e2e: pull request review threads failed: {:?}",
+                review_threads.err()
+            );
+
+            let diff_files = pr_service.list_diff_files(
+                &owner,
+                &repo,
+                first_pr.number,
+                &TraceContext::new("e2e-pr-diff-files"),
+            );
+            assert!(
+                diff_files.is_ok(),
+                "e2e: pull request diff files failed: {:?}",
+                diff_files.err()
+            );
+
+            let raw_diff = pr_service.get_raw_diff(
+                &owner,
+                &repo,
+                first_pr.number,
+                &TraceContext::new("e2e-pr-raw-diff"),
+            );
+            assert!(
+                raw_diff.is_ok(),
+                "e2e: pull request raw diff failed: {:?}",
+                raw_diff.err()
+            );
+        }
+    }
 
     let issues = issue_service.list(&owner, &repo, 20, &TraceContext::new("e2e-issue-list"));
     assert!(issues.is_ok(), "e2e: issue list failed: {:?}", issues.err());

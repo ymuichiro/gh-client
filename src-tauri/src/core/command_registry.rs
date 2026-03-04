@@ -183,6 +183,20 @@ impl CommandRegistry {
 
         registry
             .register(CommandSpec::new(
+                "pr.view",
+                "gh",
+                &[
+                    "pr",
+                    "view",
+                    "--json",
+                    "number,title,body,state,url,isDraft,author,headRefName,baseRefName,mergeStateStatus,reviewDecision,statusCheckRollup,additions,deletions,changedFiles",
+                ],
+                CommandSafety::NonDestructive,
+            ))
+            .expect("default command should register");
+
+        registry
+            .register(CommandSpec::new(
                 "pr.review",
                 "gh",
                 &["pr", "review"],
@@ -222,6 +236,96 @@ impl CommandRegistry {
                 "pr.merge",
                 "gh",
                 &["pr", "merge"],
+                CommandSafety::NonDestructive,
+            ))
+            .expect("default command should register");
+
+        registry
+            .register(CommandSpec::new(
+                "pr.comments.list",
+                "gh",
+                &["api", "--paginate"],
+                CommandSafety::NonDestructive,
+            ))
+            .expect("default command should register");
+
+        registry
+            .register(CommandSpec::new(
+                "pr.comments.create",
+                "gh",
+                &["api", "--method", "POST"],
+                CommandSafety::NonDestructive,
+            ))
+            .expect("default command should register");
+
+        registry
+            .register(CommandSpec::new(
+                "pr.review_comments.list",
+                "gh",
+                &["api", "--paginate"],
+                CommandSafety::NonDestructive,
+            ))
+            .expect("default command should register");
+
+        registry
+            .register(CommandSpec::new(
+                "pr.review_comments.create",
+                "gh",
+                &["api", "--method", "POST"],
+                CommandSafety::NonDestructive,
+            ))
+            .expect("default command should register");
+
+        registry
+            .register(CommandSpec::new(
+                "pr.review_comments.reply",
+                "gh",
+                &["api", "--method", "POST"],
+                CommandSafety::NonDestructive,
+            ))
+            .expect("default command should register");
+
+        registry
+            .register(CommandSpec::new(
+                "pr.review_threads.list",
+                "gh",
+                &["api", "graphql"],
+                CommandSafety::NonDestructive,
+            ))
+            .expect("default command should register");
+
+        registry
+            .register(CommandSpec::new(
+                "pr.review_threads.resolve",
+                "gh",
+                &["api", "graphql"],
+                CommandSafety::NonDestructive,
+            ))
+            .expect("default command should register");
+
+        registry
+            .register(CommandSpec::new(
+                "pr.review_threads.unresolve",
+                "gh",
+                &["api", "graphql"],
+                CommandSafety::NonDestructive,
+            ))
+            .expect("default command should register");
+
+        registry
+            .register(CommandSpec::new(
+                "pr.diff.files.list",
+                "gh",
+                &["api", "--paginate"],
+                CommandSafety::NonDestructive,
+            ))
+            .expect("default command should register");
+
+        registry
+            .register(CommandSpec::new(
+                "pr.diff.raw.get",
+                "gh",
+                &["pr", "diff"],
                 CommandSafety::NonDestructive,
             ))
             .expect("default command should register");
@@ -834,7 +938,7 @@ mod tests {
     #[test]
     fn default_registry_contains_expected_commands() {
         let registry = CommandRegistry::with_defaults();
-        assert_eq!(registry.len(), 76);
+        assert_eq!(registry.len(), 87);
     }
 
     #[test]

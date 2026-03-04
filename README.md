@@ -26,10 +26,10 @@
 - 最優先は「不具合の検知容易性」と「セキュリティ安全性」とする
 - バックエンドを feature-based に先行完成し、フロントエンドは後付け実装する
 
-## 実装状況（バックエンド）
+## 実装状況（バックエンド + フロントエンド）
 - `auth`: `gh auth status` の参照（ログイン状態/アカウント/scope を返す）
 - `repositories`: list/create/edit/delete, branch list/create/delete, commit list
-- `pull_requests`: list/create/edit/close/reopen/review/merge
+- `pull_requests`: list/view/create/edit/close/reopen/review/merge, issue/review comment list/create/reply, review thread list/resolve/unresolve, diff files/raw diff
 - `issues`: list/create/edit/comment/close/reopen
 - `actions`: workflow list/run list/run detail/run logs/rerun/cancel
 - `releases`: list/create/edit/delete, asset upload/delete
@@ -41,34 +41,63 @@
 - `rulesets` (P2): ruleset list/get/create/update/delete
 - `insights` (P2): traffic views/clones の取得
 
-## ローカルでの起動（現状）
-現時点は **バックエンド（Rust crate）中心** で、GUI 本体の起動コマンドはまだありません。  
-ローカルでは以下の流れで「ビルドと実動作確認」を行います。
+フロントエンド:
+- `Tauri + React + TypeScript` 構成
+- 主要機能は feature ページ、長尾は `Command Console` で全 `STABLE_COMMAND_IDS` に到達可能
+- UI 言語: 日本語/英語の切替
+- 破壊系操作: 2段階確認モーダル
+- 実行履歴: ローカル監査ログ（request_id / command_id / status）
 
-1. 依存関係を準備
+## ローカル起動
+1. 依存関係
 - Rust（stable）
+- Node.js / npm
 - GitHub CLI `gh`
-- GitHub 認証済み状態（`gh auth status` が成功すること）
+- `gh auth status` が成功すること
 
-2. ルートでビルド
+2. 依存インストール
 ```bash
-cargo build
+npm --prefix ui install
 ```
 
-3. バックエンドの動作確認（単体テスト）
+3. Web UI（mock 実行）起動
 ```bash
-cargo test
+VITE_EXECUTION_MODE=mock npm --prefix ui run dev -- --host 127.0.0.1 --port 5173
+```
+
+4. デスクトップ（Tauri）起動
+```bash
+cargo run --manifest-path src-tauri/Cargo.toml --features desktop --bin gh-client-desktop
+```
+
+5. 参考: Tauri CLI を使う場合
+```bash
+cargo tauri dev --features desktop
 ```
 
 ## テスト方法
-### 1. 通常テスト（モック/ユニット中心）
+### 1. Rust テスト（unit + live）
 ```bash
 cargo test
 ```
 
-### 2. 実 GitHub を使うライブテスト
-事前に `gh` 認証を済ませたうえで実行します。
+### 2. フロント unit/integration（Vitest）
+```bash
+npm --prefix ui run test
+```
 
+### 3. フロント E2E（Playwright / mock）
+初回のみ browser binary をインストール:
+```bash
+npx --prefix ui playwright install chromium
+```
+
+その後に実行:
+```bash
+npm --prefix ui run e2e
+```
+
+### 4. フロント E2E（Playwright / live read）
 ```bash
 OWNER=$(gh api user --jq .login)
 REPO=$(gh repo list "$OWNER" --json name --limit 1 --jq '.[0].name')
@@ -76,21 +105,20 @@ REPO=$(gh repo list "$OWNER" --json name --limit 1 --jq '.[0].name')
 GH_CLIENT_LIVE_TEST=1 \
 GH_TEST_OWNER="$OWNER" \
 GH_TEST_REPO="$REPO" \
-cargo test \
-  --test repositories_live \
-  --test pull_requests_live \
-  --test issues_live \
-  --test actions_live \
-  --test releases_live \
-  --test settings_live \
-  --test e2e_live \
-  --test p2_live \
-  -- --nocapture
+npm --prefix ui run e2e:live
 ```
 
-### 3. feature 単位でライブテストを実行
+### 5. フロント E2E（Playwright / live write opt-in）
+
 ```bash
-GH_CLIENT_LIVE_TEST=1 GH_TEST_OWNER="<owner>" GH_TEST_REPO="<repo>" cargo test --test settings_live -- --nocapture
+OWNER=$(gh api user --jq .login)
+REPO=$(gh repo list "$OWNER" --json name --limit 1 --jq '.[0].name')
+
+GH_CLIENT_LIVE_TEST=1 \
+GH_CLIENT_LIVE_WRITE_TEST=1 \
+GH_TEST_OWNER="$OWNER" \
+GH_TEST_REPO="$REPO" \
+npm --prefix ui run e2e:write
 ```
 
 ## 補足（安全性）
