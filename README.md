@@ -49,6 +49,19 @@
 - 実行履歴: ローカル監査ログ（request_id / command_id / status）
 
 ## ローカル起動
+
+共通コマンドは `Makefile` に集約しています（`make help` で一覧表示）。
+
+よく使う操作:
+```bash
+make install
+make run-desktop
+```
+
+`make run-desktop` は UI dev server 起動待ちを内包した 1 コマンド起動です（タイミング依存を排除）。
+standalone release 起動（`ui/dist` + `desktop-custom-protocol`）は `make run-desktop-release` を使ってください。
+debug 起動を分離したい場合は、別ターミナルで `make dev-web-tauri` を先に起動してから `make run-desktop-debug` を使ってください。
+
 1. 依存関係
 - Rust（stable）
 - Node.js / npm
@@ -67,15 +80,35 @@ VITE_EXECUTION_MODE=mock npm --prefix ui run dev -- --host 127.0.0.1 --port 5173
 
 4. デスクトップ（Tauri）起動
 ```bash
-cargo run --manifest-path src-tauri/Cargo.toml --features desktop --bin gh-client-desktop
+make run-desktop
 ```
 
-5. 参考: Tauri CLI を使う場合
+5. standalone release 起動（`ui/dist`）
+```bash
+make run-desktop-release
+```
+
+6. debug 起動（`dev-web-tauri` 先行起動が必要）
+```bash
+make dev-web-tauri
+make run-desktop-debug
+```
+
+7. 参考: Tauri CLI を使う場合
 ```bash
 cargo tauri dev --features desktop
 ```
 
 ## テスト方法
+`Makefile` ショートカット:
+```bash
+make test-rust
+make test-ui
+make test-e2e
+make test-e2e-live
+make test-e2e-write
+```
+
 ### 1. Rust テスト（unit + live）
 ```bash
 cargo test

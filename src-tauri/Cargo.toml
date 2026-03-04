@@ -7,6 +7,7 @@ license = "AGPL-3.0-only"
 [features]
 default = []
 desktop = ["dep:tauri"]
+desktop-custom-protocol = ["desktop", "tauri/custom-protocol"]
 
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
