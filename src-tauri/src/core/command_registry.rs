@@ -174,7 +174,7 @@ impl CommandRegistry {
                     "pr",
                     "list",
                     "--json",
-                    "number,title,state,url,isDraft,author,headRefName,baseRefName",
+                    "number,title,state,url,isDraft,author,headRefName,baseRefName,labels,assignees,updatedAt,reviewDecision,reviewRequests",
                 ],
                 CommandSafety::NonDestructive,
             ))
@@ -342,7 +342,12 @@ impl CommandRegistry {
             .register(CommandSpec::new(
                 "issue.list",
                 "gh",
-                &["issue", "list", "--json", "number,title,state,url,author"],
+                &[
+                    "issue",
+                    "list",
+                    "--json",
+                    "number,title,state,url,author,labels,assignees,updatedAt",
+                ],
                 CommandSafety::NonDestructive,
             ))
             .expect("default command should register");

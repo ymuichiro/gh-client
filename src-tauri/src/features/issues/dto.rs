@@ -8,12 +8,26 @@ pub struct IssueAuthor {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct IssueLabel {
+    pub name: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct IssueAssignee {
+    pub login: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct IssueSummary {
     pub number: u64,
     pub title: String,
     pub state: String,
     pub url: String,
     pub author: Option<IssueAuthor>,
+    pub labels: Option<Vec<IssueLabel>>,
+    pub assignees: Option<Vec<IssueAssignee>>,
+    #[serde(rename = "updatedAt")]
+    pub updated_at: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

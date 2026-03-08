@@ -568,6 +568,10 @@ impl<R: Runner + Clone> FrontendDispatcher<R> {
                     number: p.number,
                     title: p.title,
                     body: p.body,
+                    add_assignees: p.add_assignees,
+                    remove_assignees: p.remove_assignees,
+                    add_labels: p.add_labels,
+                    remove_labels: p.remove_labels,
                 };
                 self.issues_service()
                     .edit(permission, &input, &trace(&request_id))?;
@@ -1635,6 +1639,14 @@ struct IssueEditPayload {
     number: u64,
     title: Option<String>,
     body: Option<String>,
+    #[serde(default)]
+    add_assignees: Vec<String>,
+    #[serde(default)]
+    remove_assignees: Vec<String>,
+    #[serde(default)]
+    add_labels: Vec<String>,
+    #[serde(default)]
+    remove_labels: Vec<String>,
 }
 
 #[derive(Debug, Deserialize)]

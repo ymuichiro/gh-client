@@ -1,79 +1,75 @@
 # 実装計画
 
-## 方針（確定）
-- Backend First: バックエンド完成までフロントエンド実装は最小限に留める
-- Feature-Based: 機能ごとにモジュールを完結実装し、十分な単体テスト通過後に統合
-- Test Realism First: テストは本番相当の実操作を基本とする
-- Safety Exception: 削除系など破壊的操作はテスト時のみダミー化する
+## 方針（更新: 2026-03-08）
+- Product Focus First: 複数 repo の Issue/PR 横断処理を最優先する
+- Reuse Existing Assets: 既存 backend 機能は維持し、UI/UX 投資を集中する
+- Backend Reliability First: `gh` 実行の安全性・エラー正規化・監査ログを継続強化する
+- Thin UI: UI は高速操作導線に専念し、業務ロジックは backend に寄せる
+- Test Realism First: 可能な限り live 条件で主要導線を検証する
 
-## 現在ステータス（2026-03-01）
-- Phase A: 完了
-- Phase B: 完了（P0/P1 + P2 の backend module 実装済み）
-- Phase C: 完了（cross-feature E2E / resilience / security CI）
-- Phase D: 完了（Tauri + React frontend attach + Playwright E2E）
+## 現在ステータス（2026-03-08）
+- Foundation〜Frontend Attach（旧 Phase A-D）は完了
+- broad feature backend（repositories/pull_requests/issues/actions/releases/settings + P2）は実装済み
+- 次の実装対象は Cross-Repo Review Console の UX と運用速度
 
-## 開発フェーズ
-1. Phase A: Core Foundation（最優先）
-- `CommandRegistry`, `Executor`, `PolicyGuard`, `ErrorModel`, `Observability` を実装
-- `trace_id`/`request_id`、監査ログ、`SAFE_TEST_MODE` を先に実装
-
-完了条件:
-- `gh` 実行が whitelist のみで動作
-- 共通エラー分類が全 command で統一
-- 構造化ログで失敗原因を追跡可能
-
-2. Phase B: Feature Modules（バックエンド本体）
-- 実装順: `repositories` -> `pull_requests` -> `issues` -> `actions` -> `releases` -> `settings`
-- 各モジュールは単独で開発・検証し、完了後に統合
-
-各モジュールの完了条件:
-- 単体テスト: 正常系/異常系/境界値/権限不足を網羅
-- 契約テスト: `gh --json`/`gh api` の期待フィールドが固定化されている
-- 実操作テスト: 専用 GitHub テスト repo で主要ユースケースが成功
-- 監査要件: 重要操作が audit log に正しく記録される
-
-3. Phase C: Backend Integration Hardening（完了）
-- 全モジュール統合後に cross-feature シナリオを検証
-- レート制限、ネットワーク障害、`gh` バージョン差分の耐性確認
+## 開発フェーズ（今後）
+1. Phase E: Cross-Repo Inbox MVP
+- Issue/PR 横断一覧 API を主導線に再編
+- owner/repo, state, label, assignee, reviewer, updated_at の検索条件を統一
+- 保存ビュー（レビュー待ち/滞留/自分担当）を導入
 
 完了条件:
-- E2E 主要導線（PR 作成->レビュー->マージ、Issue 運用、Actions rerun、Release 作成）が成功
-- Security CI (`cargo audit`, `cargo deny`) と権限回避テストが常時グリーン
+- 1画面で複数 repo の Issue/PR を一覧できる
+- 保存ビューから 1 操作で一覧再現できる
+- 一覧初動から最初の操作まで 30 秒未満（目標）
 
-4. Phase D: Frontend Implementation（後付け / 完了）
-- バックエンド API/command 契約に従って UI を実装
-- UI 側ロジックは薄く保ち、業務ロジックは追加しない
+2. Phase F: Quick Action & Review Flow
+- 一覧から Issue/PR への quick action を追加
+- PR review（approve/request changes/comment）を右ペインで完結
+- diff への遷移を最短化（一覧 -> 詳細 -> diff）
 
 完了条件:
-- 既存バックエンドテストを壊さずに UI から全主要機能を操作可能
-- 全 stable command に GUI から到達可能
-- Playwright E2E（mock/live）を通過
+- close/approve/review の平均操作ステップを既存 UI より削減
+- 主要操作がショートカット経由で実行可能
+- 監査ログに操作結果が正しく記録される
+
+3. Phase G: Queue Intelligence
+- 滞留検知（例: 24h 超過）と優先度表示
+- 一括処理（安全ガード付き）を導入
+- 活動履歴ビューを強化
+
+完了条件:
+- 期限超過アイテムを自動で可視化
+- 一括操作の失敗時に対象ごとの結果が追跡可能
+- 取りこぼし率を定点観測できる
 
 ## 実装単位（feature-based）
-- `src-tauri/src/features/{feature}/command.rs`
-- `src-tauri/src/features/{feature}/service.rs`
-- `src-tauri/src/features/{feature}/dto.rs`
-- `src-tauri/src/features/{feature}/tests/*`
+- `src-tauri/src/features/pull_requests/*`
+- `src-tauri/src/features/issues/*`
+- `src-tauri/src/features/repositories/*`（横断一覧の補助情報）
+- `ui/src/pages/*`
+- `ui/src/components/*`
+- `ui/src/core/*`
 
 ## テスト実行ルール
 1. 実操作テスト（デフォルト）
-- テスト専用リポジトリに対して create/update/list/view/comment/review/merge/rerun/cancel を実行
+- 横断一覧、Issue/PR 更新系、レビュー系を live 条件で優先検証
 
 2. 破壊操作テスト（例外）
-- delete 系は `SAFE_TEST_MODE=true` で no-op adapter に差し替え
-- 戻り値、権限判定、監査ログ、事前確認フローのみ検証
+- delete 系は `SAFE_TEST_MODE=true` で no-op に差し替え
+- 事前確認と監査ログの整合性を重点検証
 
 3. CI ゲート
-- PR マージ条件: unit + contract + integration + security すべて成功
-- 任意の feature module でテスト不通過なら統合禁止
+- PR マージ条件: unit + integration + e2e + security を維持
+- 横断一覧と quick action の回帰テストは必須
 
 ## 品質ゲート
-- Unit: feature module ごとに十分なケース網羅（正常/異常/境界/権限）
-- Integration: `gh` 変換ロジックの golden test 固定
-- E2E: 本番相当テスト repo で主要導線を通す
+- Unit: 条件変換・DTO 正規化・失敗分類を検証
+- Integration: `gh` 出力の契約固定（`--json` / `gh api`）
+- E2E: 主要導線（検索 -> 一覧 -> 詳細 -> 操作 -> 反映）を通す
 - Security: 依存脆弱性検査 + 権限回避テスト + 監査ログ検証
 
 ## リスクと対策
-- `gh` 出力差分: フィールド固定の契約テストを必須化
-- 破壊操作の誤実行: `SAFE_TEST_MODE` と command_id ベース no-op で遮断
-- モジュール間の結合バグ: feature 完了後に段階的統合し、cross-feature E2E で検出
+- `gh` 出力差分: 契約テストを維持し、変換層で吸収
+- 操作速度と安全性の衝突: quick action は確認ポリシーをレベル別に設計
+- 横断一覧の API 負荷: 短期キャッシュ + 再試行 + バックオフで緩和

@@ -64,6 +64,10 @@ pub struct EditIssueInput {
     pub number: u64,
     pub title: Option<String>,
     pub body: Option<String>,
+    pub add_assignees: Vec<String>,
+    pub remove_assignees: Vec<String>,
+    pub add_labels: Vec<String>,
+    pub remove_labels: Vec<String>,
 }
 
 impl EditIssueInput {
@@ -75,9 +79,15 @@ impl EditIssueInput {
             return Err(AppError::validation("issue number must be greater than 0"));
         }
 
-        if self.title.is_none() && self.body.is_none() {
+        if self.title.is_none()
+            && self.body.is_none()
+            && self.add_assignees.is_empty()
+            && self.remove_assignees.is_empty()
+            && self.add_labels.is_empty()
+            && self.remove_labels.is_empty()
+        {
             return Err(AppError::validation(
-                "at least one of title/body must be provided",
+                "at least one update field must be provided",
             ));
         }
 
@@ -99,8 +109,26 @@ impl EditIssueInput {
             return Err(AppError::validation("body must not be empty when provided"));
         }
 
+        validate_non_empty_list("add_assignees", &self.add_assignees)?;
+        validate_non_empty_list("remove_assignees", &self.remove_assignees)?;
+        validate_non_empty_list("add_labels", &self.add_labels)?;
+        validate_non_empty_list("remove_labels", &self.remove_labels)?;
+
         Ok(())
     }
+}
+
+fn validate_non_empty_list(field_name: &str, values: &[String]) -> Result<(), AppError> {
+    for value in values {
+        if value.trim().is_empty() {
+            return Err(AppError::validation(format!(
+                "{} must not contain empty values",
+                field_name
+            )));
+        }
+    }
+
+    Ok(())
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -324,6 +352,26 @@ impl<R: Runner> IssuesService<R> {
         if let Some(body) = input.body.as_ref() {
             args.push("--body".to_string());
             args.push(body.clone());
+        }
+
+        if !input.add_assignees.is_empty() {
+            args.push("--add-assignee".to_string());
+            args.push(input.add_assignees.join(","));
+        }
+
+        if !input.remove_assignees.is_empty() {
+            args.push("--remove-assignee".to_string());
+            args.push(input.remove_assignees.join(","));
+        }
+
+        if !input.add_labels.is_empty() {
+            args.push("--add-label".to_string());
+            args.push(input.add_labels.join(","));
+        }
+
+        if !input.remove_labels.is_empty() {
+            args.push("--remove-label".to_string());
+            args.push(input.remove_labels.join(","));
         }
 
         let req = self.registry.build_request("issue.edit", &args)?;
@@ -576,6 +624,10 @@ mod tests {
             number: 12,
             title: Some("new title".into()),
             body: Some("new body".into()),
+            add_assignees: vec!["@me".into()],
+            remove_assignees: vec!["hubot".into()],
+            add_labels: vec!["bug".into()],
+            remove_labels: vec!["triage".into()],
         };
 
         service
@@ -585,5 +637,9 @@ mod tests {
         let (_program, args) = state.last_call().expect("command should be called");
         assert!(args.contains(&"--title".to_string()));
         assert!(args.contains(&"--body".to_string()));
+        assert!(args.contains(&"--add-assignee".to_string()));
+        assert!(args.contains(&"--remove-assignee".to_string()));
+        assert!(args.contains(&"--add-label".to_string()));
+        assert!(args.contains(&"--remove-label".to_string()));
     }
 }

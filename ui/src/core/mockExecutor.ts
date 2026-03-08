@@ -38,6 +38,30 @@ export async function executeMockEnvelope(envelope: CommandEnvelope): Promise<un
           title: "Mock pull request",
           state: "OPEN",
           url: "https://github.com/mock-user/gh-client/pull/1",
+          isDraft: false,
+          author: { login: "review-bot" },
+          headRefName: "feature/mock",
+          baseRefName: "main",
+          labels: [{ name: "needs-review" }],
+          assignees: [{ login: "mock-user" }],
+          reviewDecision: "REVIEW_REQUIRED",
+          reviewRequests: [{ requestedReviewer: { login: "maintainer-a" } }],
+          updatedAt: mockNow,
+        },
+        {
+          number: 2,
+          title: "Draft: polish inbox layout",
+          state: "OPEN",
+          url: "https://github.com/mock-user/gh-client/pull/2",
+          isDraft: true,
+          author: { login: "designer-b" },
+          headRefName: "draft/layout",
+          baseRefName: "main",
+          labels: [{ name: "ui" }],
+          assignees: [],
+          reviewDecision: null,
+          reviewRequests: [],
+          updatedAt: mockNow,
         },
       ];
 
@@ -48,6 +72,20 @@ export async function executeMockEnvelope(envelope: CommandEnvelope): Promise<un
           title: "Mock issue",
           state: "OPEN",
           url: "https://github.com/mock-user/gh-client/issues/1",
+          author: { login: "reporter-a" },
+          labels: [{ name: "bug" }, { name: "triage" }],
+          assignees: [{ login: "mock-user" }],
+          updatedAt: mockNow,
+        },
+        {
+          number: 2,
+          title: "Closed issue sample",
+          state: "CLOSED",
+          url: "https://github.com/mock-user/gh-client/issues/2",
+          author: { login: "reporter-b" },
+          labels: [{ name: "done" }],
+          assignees: [],
+          updatedAt: mockNow,
         },
       ];
 
@@ -78,8 +116,72 @@ export async function executeMockEnvelope(envelope: CommandEnvelope): Promise<un
         text: "diff --git a/README.md b/README.md\n+mock line",
       };
 
+    case "pr.view":
+      return {
+        number: 1,
+        title: "Mock pull request",
+        body: "This PR updates the inbox flow.",
+        state: "OPEN",
+        url: "https://github.com/mock-user/gh-client/pull/1",
+        isDraft: false,
+        headRefName: "feature/mock",
+        baseRefName: "main",
+        mergeStateStatus: "CLEAN",
+        reviewDecision: "REVIEW_REQUIRED",
+        additions: 8,
+        deletions: 2,
+        changedFiles: 2,
+      };
+
+    case "pr.comments.list":
+      return [
+        {
+          id: 9001,
+          kind: "issue_comment",
+          body: "Please double check the empty state copy.",
+          created_at: mockNow,
+          author: { login: "maintainer-a" },
+        },
+      ];
+
+    case "pr.review_threads.list":
+      return [
+        {
+          thread_id: "THREAD_MOCK_1",
+          is_resolved: false,
+          is_outdated: false,
+          path: "ui/src/pages/InboxPage.tsx",
+          line: 120,
+          comments: [
+            {
+              id: 9101,
+              kind: "review_comment",
+              body: "Could we avoid duplicate fetches here?",
+              created_at: mockNow,
+              author: { login: "reviewer-a" },
+            },
+          ],
+        },
+        {
+          thread_id: "THREAD_MOCK_2",
+          is_resolved: true,
+          is_outdated: false,
+          path: "ui/src/styles.css",
+          line: 50,
+          comments: [],
+        },
+      ];
+
     case "pr.diff.files.list":
       return [
+        {
+          filename: "ui/src/pages/InboxPage.tsx",
+          status: "modified",
+          additions: 6,
+          deletions: 2,
+          changes: 8,
+          patch: "@@ -120,6 +120,10 @@\n+const requestSeq = ++prDetailFetchSeq.current;\n+if (requestSeq !== prDetailFetchSeq.current) return;",
+        },
         {
           filename: "README.md",
           status: "modified",
