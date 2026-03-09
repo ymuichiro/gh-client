@@ -26,12 +26,14 @@ test("mock read flow for issues, pull requests and settings", async ({ page }) =
   await mockUserIssue.click();
   await page.keyboard.press("a");
   await expect(page.getByRole("heading", { name: "Approve 実行確認" })).toHaveCount(0);
+  await page.getByRole("button", { name: /一覧に戻る|Back to list/ }).click();
 
   await mockUserClosedIssue.click();
   await expect(page.getByRole("button", { name: "close (C)" })).toBeDisabled();
   await page.keyboard.press("r");
   await expect(page.getByRole("heading", { name: "コメント投稿" })).toBeVisible();
   await page.getByRole("button", { name: "キャンセル" }).click();
+  await page.getByRole("button", { name: /一覧に戻る|Back to list/ }).click();
 
   await page.getByRole("button", { name: "表示中 open を一括 close" }).click();
   await expect(page.getByRole("heading", { name: "一括 close 実行" })).toBeVisible();

@@ -215,6 +215,7 @@ export function InboxPage({
   const [error, setError] = useState<string | null>(null);
   const [fetchWarnings, setFetchWarnings] = useState<string[]>([]);
   const [selectedItemId, setSelectedItemId] = useState("");
+  const [detailOpen, setDetailOpen] = useState(false);
   const [selectedDiffPath, setSelectedDiffPath] = useState<string | null>(null);
   const [mutationRunning, setMutationRunning] = useState(false);
   const [batchRunning, setBatchRunning] = useState(false);
@@ -455,13 +456,12 @@ export function InboxPage({
   }, [refreshInbox]);
 
   const selectedItem = useMemo(() => {
-    if (filteredItems.length === 0) {
+    if (!selectedItemId) {
       return null;
     }
 
-    const current = filteredItems.find((item) => item.id === selectedItemId);
-    return current ?? filteredItems[0];
-  }, [filteredItems, selectedItemId]);
+    return modeItems.find((item) => item.id === selectedItemId) ?? null;
+  }, [modeItems, selectedItemId]);
 
   const resolvePermissionForItem = useCallback(
     (item: InboxItem | null): CommandPermission | null => {
@@ -477,15 +477,17 @@ export function InboxPage({
   );
 
   useEffect(() => {
-    if (!selectedItem && filteredItems.length === 0) {
-      setSelectedItemId("");
+    if (!selectedItemId) {
       return;
     }
 
-    if (selectedItem && selectedItem.id !== selectedItemId) {
-      setSelectedItemId(selectedItem.id);
+    if (selectedItem) {
+      return;
     }
-  }, [filteredItems, selectedItem, selectedItemId]);
+
+    setSelectedItemId("");
+    setDetailOpen(false);
+  }, [selectedItem, selectedItemId]);
 
   const selectedPermission = useMemo(() => {
     return resolvePermissionForItem(selectedItem);
@@ -493,7 +495,7 @@ export function InboxPage({
 
   useEffect(() => {
     const target = selectedItem;
-    if (!target || target.kind !== "pr") {
+    if (!detailOpen || !target || target.kind !== "pr") {
       prDetailFetchSeq.current += 1;
       setPrDetailState(initialPrDetailState);
       setSelectedDiffPath(null);
@@ -573,11 +575,11 @@ export function InboxPage({
         return diffFiles[0]?.filename ?? null;
       });
     });
-  }, [fmt, repoTargetsByKey, selectedItem, t]);
+  }, [detailOpen, fmt, repoTargetsByKey, selectedItem, t]);
 
   useEffect(() => {
     const target = selectedItem;
-    if (!target || target.kind !== "issue") {
+    if (!detailOpen || !target || target.kind !== "issue") {
       issueDetailFetchSeq.current += 1;
       setIssueDetailState(initialIssueDetailState);
       return;
@@ -616,7 +618,7 @@ export function InboxPage({
           detail: null,
         });
       });
-  }, [repoTargetsByKey, selectedItem]);
+  }, [detailOpen, repoTargetsByKey, selectedItem]);
 
   const selectedDiffFile = useMemo(
     () => prDetailState.diffFiles.find((file) => file.filename === selectedDiffPath) ?? null,
@@ -1050,7 +1052,7 @@ export function InboxPage({
     const hasModal = modalState.kind !== "none";
 
     const onKeyDown = (event: KeyboardEvent) => {
-      if (hasModal || mutationRunning || modalRunning) {
+      if (hasModal || mutationRunning || modalRunning || !detailOpen) {
         return;
       }
 
@@ -1104,6 +1106,7 @@ export function InboxPage({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [
     closeSelected,
+    detailOpen,
     modalRunning,
     modalState.kind,
     mutationRunning,
@@ -1203,21 +1206,6 @@ export function InboxPage({
             disabled={loading}
           >
             {loading ? t("inbox.refreshing") : t("inbox.refresh")}
-          </button>
-          <button
-            className="btn secondary"
-            type="button"
-            onClick={() => {
-              if (selectedItem) {
-                onInspect(
-                  `${selectedItem.kind.toUpperCase()} ${selectedItem.owner}/${selectedItem.repo}#${selectedItem.number}`,
-                  selectedItem,
-                );
-              }
-            }}
-            disabled={!selectedItem}
-          >
-            {t("inbox.inspect_selected")}
           </button>
         </div>
 
@@ -1517,8 +1505,13 @@ export function InboxPage({
               <button
                 key={item.id}
                 type="button"
-                className={item.id === selectedItem?.id ? "queue-item active" : "queue-item"}
-                onClick={() => setSelectedItemId(item.id)}
+                className={
+                  detailOpen && item.id === selectedItem?.id ? "queue-item active" : "queue-item"
+                }
+                onClick={() => {
+                  setSelectedItemId(item.id);
+                  setDetailOpen(true);
+                }}
               >
                 <div className="queue-item-header">
                   <span className="tag">{item.kind.toUpperCase()}</span>
@@ -1571,9 +1564,28 @@ export function InboxPage({
         </div>
       </section>
 
-      <section className="inbox-panel inbox-right">
-        {selectedItem ? (
-          <>
+      {detailOpen && selectedItem ? (
+        <div
+          className="inbox-detail-backdrop"
+          role="presentation"
+          onClick={() => setDetailOpen(false)}
+        >
+          <section
+            className="inbox-panel inbox-detail-sheet"
+            role="dialog"
+            aria-modal="true"
+            aria-label={`${selectedItem.kind.toUpperCase()} #${selectedItem.number}`}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="row gap-sm wrap">
+              <button
+                className="btn secondary"
+                type="button"
+                onClick={() => setDetailOpen(false)}
+              >
+                {t("inbox.detail.back")}
+              </button>
+            </div>
             <header className="section-header">
               <h2>
                 {selectedItem.kind.toUpperCase()} #{selectedItem.number}
@@ -1931,11 +1943,9 @@ export function InboxPage({
                 </section>
               </>
             ) : null}
-          </>
-        ) : (
-          <p className="info-text">{t("inbox.no_selection")}</p>
-        )}
-      </section>
+          </section>
+        </div>
+      ) : null}
 
       {modalConfig ? (
         <InboxActionModal

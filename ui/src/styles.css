@@ -588,7 +588,7 @@ label {
 
 .inbox-page {
   display: grid;
-  grid-template-columns: minmax(290px, 330px) minmax(340px, 1fr) minmax(360px, 1fr);
+  grid-template-columns: minmax(290px, 330px) minmax(340px, 1fr);
   gap: 12px;
   align-items: start;
 }
@@ -701,6 +701,27 @@ label {
   flex-wrap: wrap;
   color: var(--text-subtle);
   font-size: 0.75rem;
+}
+
+.inbox-detail-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 55;
+  background: var(--overlay);
+  backdrop-filter: blur(3px);
+  display: grid;
+  place-items: center;
+  padding: 16px;
+}
+
+.inbox-detail-sheet {
+  width: min(1080px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--bg-surface);
+  box-shadow: var(--shadow-md);
 }
 
 .diff-layout {
@@ -935,6 +956,15 @@ label {
   .row.wrap {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .inbox-detail-backdrop {
+    padding: 10px;
+  }
+
+  .inbox-detail-sheet {
+    width: calc(100vw - 20px);
+    max-height: calc(100vh - 20px);
   }
 
   .diff-layout {
