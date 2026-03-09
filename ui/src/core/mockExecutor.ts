@@ -2,6 +2,8 @@ import type { CommandEnvelope } from "./types";
 import type { CommandId } from "./commandIds";
 
 const mockNow = new Date().toISOString();
+const mockState = createInitialMockState();
+let nextMockIssueCommentId = 2000;
 
 export async function executeMockEnvelope(envelope: CommandEnvelope): Promise<unknown> {
   switch (envelope.command_id) {
@@ -66,28 +68,103 @@ export async function executeMockEnvelope(envelope: CommandEnvelope): Promise<un
       ];
 
     case "issue.list":
-      return [
-        {
-          number: 1,
-          title: "Mock issue",
-          state: "OPEN",
-          url: "https://github.com/mock-user/gh-client/issues/1",
-          author: { login: "reporter-a" },
-          labels: [{ name: "bug" }, { name: "triage" }],
-          assignees: [{ login: "mock-user" }],
-          updatedAt: mockNow,
-        },
-        {
-          number: 2,
-          title: "Closed issue sample",
-          state: "CLOSED",
-          url: "https://github.com/mock-user/gh-client/issues/2",
-          author: { login: "reporter-b" },
-          labels: [{ name: "done" }],
-          assignees: [],
-          updatedAt: mockNow,
-        },
-      ];
+      return ensureMockIssues(envelope.payload).map((issue) => ({
+        number: issue.number,
+        title: issue.title,
+        state: issue.state,
+        url: issue.url,
+        author: issue.author,
+        labels: issue.labels,
+        assignees: issue.assignees,
+        updatedAt: issue.updatedAt,
+      }));
+
+    case "issue.view": {
+      const owner = stringValue(envelope.payload.owner, "mock-user");
+      const repo = stringValue(envelope.payload.repo, "gh-client");
+      const number = numberValue(envelope.payload.number, 1);
+      const issue = ensureMockIssues(envelope.payload).find((entry) => entry.number === number);
+      if (!issue) {
+        throw new Error(`issue not found: ${owner}/${repo}#${number}`);
+      }
+
+      return {
+        number: issue.number,
+        title: issue.title,
+        state: issue.state,
+        url: issue.url,
+        body: issue.body,
+        author: issue.author,
+        labels: issue.labels,
+        assignees: issue.assignees,
+        updatedAt: issue.updatedAt,
+        comments: issue.comments,
+      };
+    }
+
+    case "issue.close": {
+      const number = numberValue(envelope.payload.number, 0);
+      const issue = ensureMockIssues(envelope.payload).find((entry) => entry.number === number);
+      if (issue) {
+        issue.state = "CLOSED";
+        issue.updatedAt = new Date().toISOString();
+      }
+      return {
+        ok: true,
+        mocked: true,
+      };
+    }
+
+    case "issue.reopen": {
+      const number = numberValue(envelope.payload.number, 0);
+      const issue = ensureMockIssues(envelope.payload).find((entry) => entry.number === number);
+      if (issue) {
+        issue.state = "OPEN";
+        issue.updatedAt = new Date().toISOString();
+      }
+      return {
+        ok: true,
+        mocked: true,
+      };
+    }
+
+    case "issue.comment": {
+      const number = numberValue(envelope.payload.number, 0);
+      const body = stringValue(envelope.payload.body, "").trim();
+      const owner = stringValue(envelope.payload.owner, "mock-user");
+      const repo = stringValue(envelope.payload.repo, "gh-client");
+      const issue = ensureMockIssues(envelope.payload).find((entry) => entry.number === number);
+      if (issue && body.length > 0) {
+        const commentId = nextMockIssueCommentId;
+        nextMockIssueCommentId += 1;
+        const createdAt = new Date().toISOString();
+        issue.comments.push({
+          id: commentId,
+          body,
+          createdAt,
+          author: { login: "mock-user" },
+          url: `https://github.com/${owner}/${repo}/issues/${number}#issuecomment-${commentId}`,
+        });
+        issue.updatedAt = createdAt;
+      }
+      return {
+        ok: true,
+        mocked: true,
+      };
+    }
+
+    case "issue.edit": {
+      const number = numberValue(envelope.payload.number, 0);
+      const issue = ensureMockIssues(envelope.payload).find((entry) => entry.number === number);
+      if (issue) {
+        applyMockIssueEdit(issue, envelope.payload);
+        issue.updatedAt = new Date().toISOString();
+      }
+      return {
+        ok: true,
+        mocked: true,
+      };
+    }
 
     case "run.list":
       return [
@@ -234,4 +311,162 @@ function stringValue(value: unknown, fallback: string): string {
   }
 
   return fallback;
+}
+
+function numberValue(value: unknown, fallback: number): number {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+
+  return fallback;
+}
+
+interface MockIssueComment {
+  id: number;
+  body: string;
+  createdAt: string;
+  author: { login: string };
+  url: string;
+}
+
+interface MockIssueRecord {
+  number: number;
+  title: string;
+  state: "OPEN" | "CLOSED";
+  url: string;
+  body: string;
+  author: { login: string };
+  labels: Array<{ name: string }>;
+  assignees: Array<{ login: string }>;
+  updatedAt: string;
+  comments: MockIssueComment[];
+}
+
+type MockIssueStore = Record<string, MockIssueRecord[]>;
+
+function createInitialMockState(): MockIssueStore {
+  return {};
+}
+
+function ensureMockIssues(payload: Record<string, unknown>): MockIssueRecord[] {
+  const owner = stringValue(payload.owner, "mock-user");
+  const repo = stringValue(payload.repo, "gh-client");
+  const key = `${owner}/${repo}`;
+  if (!mockState[key]) {
+    mockState[key] = createDefaultIssues(owner, repo);
+  }
+  return mockState[key];
+}
+
+function createDefaultIssues(owner: string, repo: string): MockIssueRecord[] {
+  return [
+    {
+      number: 1,
+      title: "Mock issue",
+      state: "OPEN",
+      url: `https://github.com/${owner}/${repo}/issues/1`,
+      body: "This is a mock issue body. Use quick actions to test edits and comments.",
+      author: { login: "reporter-a" },
+      labels: [{ name: "bug" }, { name: "triage" }],
+      assignees: [{ login: "mock-user" }],
+      updatedAt: mockNow,
+      comments: [
+        {
+          id: 1001,
+          body: "Initial discussion comment.",
+          createdAt: mockNow,
+          author: { login: "maintainer-a" },
+          url: `https://github.com/${owner}/${repo}/issues/1#issuecomment-1001`,
+        },
+      ],
+    },
+    {
+      number: 2,
+      title: "Closed issue sample",
+      state: "CLOSED",
+      url: `https://github.com/${owner}/${repo}/issues/2`,
+      body: "Closed issue body.",
+      author: { login: "reporter-b" },
+      labels: [{ name: "done" }],
+      assignees: [],
+      updatedAt: mockNow,
+      comments: [],
+    },
+  ];
+}
+
+function applyMockIssueEdit(issue: MockIssueRecord, payload: Record<string, unknown>): void {
+  const addAssignees = stringArrayValue(payload.add_assignees);
+  const removeAssignees = stringArrayValue(payload.remove_assignees);
+  const addLabels = stringArrayValue(payload.add_labels);
+  const removeLabels = stringArrayValue(payload.remove_labels);
+
+  if (addAssignees.length > 0) {
+    const existing = new Set(issue.assignees.map((entry) => entry.login.toLowerCase()));
+    for (const assignee of addAssignees) {
+      if (!existing.has(assignee.toLowerCase())) {
+        issue.assignees.push({ login: assignee });
+        existing.add(assignee.toLowerCase());
+      }
+    }
+  }
+
+  if (removeAssignees.length > 0) {
+    const removes = new Set(removeAssignees.map((entry) => entry.toLowerCase()));
+    issue.assignees = issue.assignees.filter(
+      (entry) => !removes.has(entry.login.toLowerCase()),
+    );
+  }
+
+  if (addLabels.length > 0) {
+    const existing = new Set(issue.labels.map((entry) => entry.name.toLowerCase()));
+    for (const label of addLabels) {
+      if (!existing.has(label.toLowerCase())) {
+        issue.labels.push({ name: label });
+        existing.add(label.toLowerCase());
+      }
+    }
+  }
+
+  if (removeLabels.length > 0) {
+    const removes = new Set(removeLabels.map((entry) => entry.toLowerCase()));
+    issue.labels = issue.labels.filter((entry) => !removes.has(entry.name.toLowerCase()));
+  }
+
+  const title = stringValue(payload.title, "").trim();
+  if (title.length > 0) {
+    issue.title = title;
+  }
+
+  const body = stringValue(payload.body, "").trim();
+  if (body.length > 0) {
+    issue.body = body;
+  }
+}
+
+function stringArrayValue(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  const deduped: string[] = [];
+  for (const entry of value) {
+    if (typeof entry !== "string") {
+      continue;
+    }
+    const normalized = entry.trim();
+    if (normalized.length === 0 || deduped.includes(normalized)) {
+      continue;
+    }
+    deduped.push(normalized);
+  }
+
+  return deduped;
 }

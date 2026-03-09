@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { InboxActionModal } from "./InboxActionModal";
@@ -119,5 +119,46 @@ describe("InboxActionModal", () => {
     );
 
     expect(screen.getByLabelText("Body")).toHaveValue("default");
+  });
+
+  it("submits multi-select values as comma-separated string", async () => {
+    const onConfirm = vi.fn(async () => undefined);
+
+    render(
+      <InboxActionModal
+        open
+        title="Edit assignees"
+        fields={[
+          {
+            name: "selected_values",
+            label: "Candidates",
+            type: "select",
+            multiple: true,
+            options: [
+              { label: "alice", value: "alice" },
+              { label: "bob", value: "bob" },
+              { label: "carol", value: "carol" },
+            ],
+          },
+        ]}
+        confirmLabel="Apply"
+        cancelLabel="Cancel"
+        requiredFieldMessage={(label) => `${label} is required`}
+        tokenMismatchMessage="Token mismatch"
+        onCancel={() => undefined}
+        onConfirm={onConfirm}
+      />,
+    );
+
+    const select = screen.getByLabelText("Candidates");
+    const options = within(select).getAllByRole("option");
+    (options[0] as HTMLOptionElement).selected = true;
+    (options[1] as HTMLOptionElement).selected = true;
+    fireEvent.change(select);
+
+    fireEvent.click(screen.getByRole("button", { name: "Apply" }));
+
+    await waitFor(() => expect(onConfirm).toHaveBeenCalledTimes(1));
+    expect(onConfirm).toHaveBeenCalledWith({ selected_values: "alice,bob" });
   });
 });

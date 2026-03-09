@@ -354,6 +354,15 @@ impl CommandRegistry {
 
         registry
             .register(CommandSpec::new(
+                "issue.view",
+                "gh",
+                &["issue", "view"],
+                CommandSafety::NonDestructive,
+            ))
+            .expect("default command should register");
+
+        registry
+            .register(CommandSpec::new(
                 "issue.create",
                 "gh",
                 &["issue", "create"],
@@ -951,7 +960,7 @@ mod tests {
     #[test]
     fn default_registry_contains_expected_commands() {
         let registry = CommandRegistry::with_defaults();
-        assert_eq!(registry.len(), 88);
+        assert_eq!(registry.len(), 89);
     }
 
     #[test]

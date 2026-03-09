@@ -78,6 +78,7 @@ pub const SUPPORTED_COMMAND_IDS: &[&str] = &[
     "pr.diff.files.list",
     "pr.diff.raw.get",
     "issue.list",
+    "issue.view",
     "issue.create",
     "issue.comment",
     "issue.edit",
@@ -529,6 +530,13 @@ impl<R: Runner + Clone> FrontendDispatcher<R> {
                 let result =
                     self.issues_service()
                         .list(&p.owner, &p.repo, p.limit, &trace(&request_id))?;
+                to_json(result)
+            }
+            "issue.view" => {
+                let p: IssueNumberPayload = parse_payload(payload)?;
+                let result =
+                    self.issues_service()
+                        .view(&p.owner, &p.repo, p.number, &trace(&request_id))?;
                 to_json(result)
             }
             "issue.create" => {
@@ -1622,6 +1630,13 @@ struct IssueCreatePayload {
     repo: String,
     title: String,
     body: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct IssueNumberPayload {
+    owner: String,
+    repo: String,
+    number: u64,
 }
 
 #[derive(Debug, Deserialize)]

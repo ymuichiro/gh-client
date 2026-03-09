@@ -272,6 +272,9 @@ const payloadSchemas: Partial<Record<CommandId, z.ZodTypeAny>> = {
   "issue.list": z
     .object({ owner: z.string().min(1), repo: z.string().min(1), limit: z.number().optional() })
     .passthrough(),
+  "issue.view": z
+    .object({ owner: z.string().min(1), repo: z.string().min(1), number: z.number().positive() })
+    .passthrough(),
   "issue.create": z
     .object({
       owner: z.string().min(1),
@@ -527,6 +530,7 @@ const fieldOverrides: Partial<Record<CommandId, CommandField[]>> = {
   "pr.diff.raw.get": PR_NUMBER_FIELDS,
 
   "issue.list": REPO_LIMIT_FIELDS,
+  "issue.view": PR_NUMBER_FIELDS,
   "issue.create": [...REPO_SCOPE_FIELDS, { name: "title", label: "title", type: "text", required: true }, { name: "body", label: "body", type: "textarea" }],
   "issue.comment": [...PR_NUMBER_FIELDS, { name: "body", label: "body", type: "textarea", required: true }],
   "issue.edit": [

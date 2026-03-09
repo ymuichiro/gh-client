@@ -13,6 +13,7 @@ export interface InboxActionModalField {
   placeholder?: string;
   options?: ModalOption[];
   initialValue?: string;
+  multiple?: boolean;
 }
 
 interface InboxActionModalProps {
@@ -142,10 +143,31 @@ export function InboxActionModal({
             ) : field.type === "select" ? (
               <select
                 className="input"
-                value={values[field.name] ?? ""}
-                onChange={(event) =>
-                  setValues((current) => ({ ...current, [field.name]: event.target.value }))
+                value={
+                  field.multiple
+                    ? parseCommaSeparated(values[field.name] ?? "")
+                    : values[field.name] ?? ""
                 }
+                multiple={field.multiple}
+                size={
+                  field.multiple
+                    ? Math.min(Math.max(field.options?.length ?? 3, 3), 8)
+                    : undefined
+                }
+                onChange={(event) => {
+                  if (field.multiple) {
+                    const selectedValues = Array.from(event.target.selectedOptions).map(
+                      (option) => option.value,
+                    );
+                    setValues((current) => ({
+                      ...current,
+                      [field.name]: selectedValues.join(","),
+                    }));
+                    return;
+                  }
+
+                  setValues((current) => ({ ...current, [field.name]: event.target.value }));
+                }}
               >
                 {field.options?.map((option) => (
                   <option key={option.value} value={option.value}>
@@ -201,4 +223,11 @@ export function InboxActionModal({
       </div>
     </div>
   );
+}
+
+function parseCommaSeparated(raw: string): string[] {
+  return raw
+    .split(",")
+    .map((value) => value.trim())
+    .filter((value) => value.length > 0);
 }

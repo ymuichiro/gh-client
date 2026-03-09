@@ -3,7 +3,7 @@ use crate::core::executor::Runner;
 use crate::core::observability::TraceContext;
 use crate::core::policy_guard::RepoPermission;
 
-use super::dto::{IssueCreated, IssueSummary};
+use super::dto::{IssueCreated, IssueDetail, IssueSummary};
 use super::service::{
     CloseIssueInput, CommentIssueInput, CreateIssueInput, EditIssueInput, IssuesService,
     ReopenIssueInput,
@@ -27,6 +27,17 @@ impl<R: Runner> IssuesCommandHandler<R> {
     ) -> Result<Vec<IssueSummary>, AppError> {
         let trace = TraceContext::new(request_id);
         self.service.list(owner, repo, limit, &trace)
+    }
+
+    pub fn view_issue(
+        &self,
+        request_id: &str,
+        owner: &str,
+        repo: &str,
+        number: u64,
+    ) -> Result<IssueDetail, AppError> {
+        let trace = TraceContext::new(request_id);
+        self.service.view(owner, repo, number, &trace)
     }
 
     pub fn create_issue(

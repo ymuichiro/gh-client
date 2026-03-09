@@ -4,7 +4,10 @@ use crate::core::executor::{CommandExecutor, Runner};
 use crate::core::observability::TraceContext;
 use crate::core::policy_guard::{PolicyGuard, RepoPermission};
 
-use super::dto::{IssueCreated, IssueSummary, parse_issue_created_output, parse_issue_summaries};
+use super::dto::{
+    IssueCreated, IssueDetail, IssueSummary, parse_issue_created_output, parse_issue_detail,
+    parse_issue_summaries,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CreateIssueInput {
@@ -245,6 +248,32 @@ impl<R: Runner> IssuesService<R> {
         let req = self.registry.build_request("issue.list", &args)?;
         let (output, _audit) = self.executor.execute(&req, trace)?;
         parse_issue_summaries(&output.stdout)
+    }
+
+    pub fn view(
+        &self,
+        owner: &str,
+        repo: &str,
+        number: u64,
+        trace: &TraceContext,
+    ) -> Result<IssueDetail, AppError> {
+        if owner.trim().is_empty() || repo.trim().is_empty() {
+            return Err(AppError::validation("owner and repo are required"));
+        }
+        if number == 0 {
+            return Err(AppError::validation("issue number must be greater than 0"));
+        }
+
+        let args = vec![
+            number.to_string(),
+            "--repo".to_string(),
+            format!("{}/{}", owner, repo),
+            "--json".to_string(),
+            "number,title,state,url,author,labels,assignees,updatedAt,body,comments".to_string(),
+        ];
+        let req = self.registry.build_request("issue.view", &args)?;
+        let (output, _audit) = self.executor.execute(&req, trace)?;
+        parse_issue_detail(&output.stdout)
     }
 
     pub fn create(
@@ -495,6 +524,38 @@ mod tests {
         assert_eq!(program, "gh");
         assert!(args.contains(&"issue".to_string()));
         assert!(args.contains(&"--repo".to_string()));
+    }
+
+    #[test]
+    fn view_executes_issue_view_command() {
+        let output = RawExecutionOutput {
+            exit_code: 0,
+            stdout: r#"{
+                "number": 11,
+                "title": "Bug",
+                "state": "OPEN",
+                "url": "https://github.com/octocat/hello/issues/11",
+                "body": "issue body",
+                "comments": []
+            }"#
+            .to_string(),
+            stderr: String::new(),
+        };
+        let (runner, state) = RecordingRunner::new(output);
+        let service = IssuesService::new(
+            CommandRegistry::with_defaults(),
+            CommandExecutor::new(runner, false),
+        );
+
+        let detail = service
+            .view("octocat", "hello", 11, &trace())
+            .expect("view should succeed");
+        assert_eq!(detail.number, 11);
+
+        let (_program, args) = state.last_call().expect("command should be called");
+        assert!(args.contains(&"issue".to_string()));
+        assert!(args.contains(&"view".to_string()));
+        assert!(args.contains(&"--json".to_string()));
     }
 
     #[test]

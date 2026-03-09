@@ -107,6 +107,32 @@ interface PullRequestDetailState {
   rawDiffText: string;
 }
 
+interface IssueCommentEntry {
+  id?: number | null;
+  body: string;
+  createdAt?: string | null;
+  author?: { login?: string } | null;
+  url?: string | null;
+}
+
+interface IssueDetail {
+  number: number;
+  title: string;
+  state: string;
+  url: string;
+  body: string;
+  comments: IssueCommentEntry[];
+  assignees?: Array<{ login?: string }>;
+  labels?: Array<{ name?: string }>;
+  updatedAt?: string | null;
+}
+
+interface IssueDetailState {
+  loading: boolean;
+  error: string | null;
+  detail: IssueDetail | null;
+}
+
 interface RepoFetchResult {
   key: string;
   items: InboxItem[];
@@ -134,7 +160,7 @@ type ModalState =
   | { kind: "none" }
   | { kind: "save_view" }
   | { kind: "approve"; item: InboxItem }
-  | { kind: "comment"; item: InboxItem }
+  | { kind: "comment"; item: InboxItem; initialBody?: string }
   | { kind: "request_changes"; item: InboxItem }
   | { kind: "merge"; item: InboxItem }
   | { kind: "issue_edit"; item: InboxItem; field: IssueEditField }
@@ -158,6 +184,12 @@ const initialPrDetailState: PullRequestDetailState = {
   threads: [],
   diffFiles: [],
   rawDiffText: "",
+};
+
+const initialIssueDetailState: IssueDetailState = {
+  loading: false,
+  error: null,
+  detail: null,
 };
 
 export function InboxPage({
@@ -189,12 +221,14 @@ export function InboxPage({
   const [batchProgress, setBatchProgress] = useState<BatchProgress | null>(null);
   const [batchResult, setBatchResult] = useState<BatchExecutionResult | null>(null);
   const [prDetailState, setPrDetailState] = useState<PullRequestDetailState>(initialPrDetailState);
+  const [issueDetailState, setIssueDetailState] = useState<IssueDetailState>(initialIssueDetailState);
   const [modalState, setModalState] = useState<ModalState>({ kind: "none" });
   const [modalRunning, setModalRunning] = useState(false);
   const [modalError, setModalError] = useState<string | null>(null);
 
   const inboxFetchSeq = useRef(0);
   const prDetailFetchSeq = useRef(0);
+  const issueDetailFetchSeq = useRef(0);
 
   const defaultViews = useMemo(() => buildDefaultViews(t, mode), [t, mode]);
   const allViews = useMemo(() => [...defaultViews, ...customViews], [customViews, defaultViews]);
@@ -436,7 +470,7 @@ export function InboxPage({
       }
 
       return (
-        repoTargetsByKey.get(toRepoKey(item.owner, item.repo))?.viewerPermission ?? null
+        repoTargetsByKey.get(toRepoKey(item.owner, item.repo))?.viewerPermission ?? "write"
       );
     },
     [repoTargetsByKey],
@@ -540,6 +574,49 @@ export function InboxPage({
       });
     });
   }, [fmt, repoTargetsByKey, selectedItem, t]);
+
+  useEffect(() => {
+    const target = selectedItem;
+    if (!target || target.kind !== "issue") {
+      issueDetailFetchSeq.current += 1;
+      setIssueDetailState(initialIssueDetailState);
+      return;
+    }
+
+    const permission =
+      repoTargetsByKey.get(toRepoKey(target.owner, target.repo))?.viewerPermission ?? "viewer";
+    const requestSeq = ++issueDetailFetchSeq.current;
+
+    setIssueDetailState({ loading: true, error: null, detail: null });
+
+    void executeCommand<IssueDetail>(
+      "issue.view",
+      { owner: target.owner, repo: target.repo, number: target.number },
+      { permission },
+    )
+      .then((result) => {
+        if (requestSeq !== issueDetailFetchSeq.current) {
+          return;
+        }
+
+        setIssueDetailState({
+          loading: false,
+          error: null,
+          detail: normalizeIssueDetail(result.data),
+        });
+      })
+      .catch((cause) => {
+        if (requestSeq !== issueDetailFetchSeq.current) {
+          return;
+        }
+
+        setIssueDetailState({
+          loading: false,
+          error: toErrorMessage(cause),
+          detail: null,
+        });
+      });
+  }, [repoTargetsByKey, selectedItem]);
 
   const selectedDiffFile = useMemo(
     () => prDetailState.diffFiles.find((file) => file.filename === selectedDiffPath) ?? null,
@@ -898,8 +975,20 @@ export function InboxPage({
               return;
             }
 
-            const raw = values.values?.trim() ?? "";
-            const parsed = parseCommaSeparated(raw);
+            const parsed = (() => {
+              if (
+                modal.field === "add_assignees" ||
+                modal.field === "remove_assignees"
+              ) {
+                const selected = parseCommaSeparated(values.selected_values ?? "");
+                const manual = parseCommaSeparated(values.manual_values ?? "");
+                return dedupeStrings([...selected, ...manual]);
+              }
+
+              const raw = values.values?.trim() ?? "";
+              return parseCommaSeparated(raw);
+            })();
+
             if (parsed.length === 0) {
               setModalError(t("inbox.modal.validation.required"));
               return;
@@ -1028,6 +1117,64 @@ export function InboxPage({
       ? selectedDiffFile.patch
       : prDetailState.rawDiffText;
 
+  const issueEditAssigneeOptions = useMemo(() => {
+    if (modalState.kind !== "issue_edit") {
+      return [] as string[];
+    }
+
+    if (
+      modalState.field !== "add_assignees" &&
+      modalState.field !== "remove_assignees"
+    ) {
+      return [] as string[];
+    }
+
+    const repoKey = toRepoKey(modalState.item.owner, modalState.item.repo);
+    const known = new Set<string>();
+
+    for (const item of items) {
+      if (toRepoKey(item.owner, item.repo) !== repoKey) {
+        continue;
+      }
+
+      if (item.author) {
+        known.add(item.author);
+      }
+      for (const assignee of item.assignees) {
+        known.add(assignee);
+      }
+    }
+
+    for (const assignee of modalState.item.assignees) {
+      known.add(assignee);
+    }
+
+    if (issueDetailState.detail && issueDetailState.detail.number === modalState.item.number) {
+      for (const assignee of issueDetailState.detail.assignees ?? []) {
+        const login = asString(assignee.login);
+        if (login) {
+          known.add(login);
+        }
+      }
+
+      for (const comment of issueDetailState.detail.comments) {
+        const login = asString(asRecord(comment.author).login);
+        if (login) {
+          known.add(login);
+        }
+      }
+    }
+
+    const currentAssignees = new Set(modalState.item.assignees.map((assignee) => assignee.toLowerCase()));
+    const options = [...known].sort((left, right) => left.localeCompare(right));
+
+    if (modalState.field === "remove_assignees") {
+      return options.filter((login) => currentAssignees.has(login.toLowerCase()));
+    }
+
+    return options.filter((login) => !currentAssignees.has(login.toLowerCase()));
+  }, [issueDetailState.detail, items, modalState]);
+
   const modalConfig = buildModalConfig(
     modalState,
     t,
@@ -1035,6 +1182,7 @@ export function InboxPage({
     selectedRepoKeys,
     filters,
     sortMode,
+    issueEditAssigneeOptions,
   );
 
   return (
@@ -1473,67 +1621,157 @@ export function InboxPage({
             </div>
 
             {selectedItem.kind === "issue" ? (
-              <section className="inbox-group">
-                <h3>{t("inbox.issue.quick_edit")}</h3>
-                <div className="row gap-sm wrap">
-                  <button
-                    className="btn secondary"
-                    type="button"
-                    disabled={Boolean(guardedReasonForSelected("issue_edit")) || mutationRunning}
-                    onClick={() =>
-                      openModal({
-                        kind: "issue_edit",
-                        item: selectedItem,
-                        field: "add_assignees",
-                      })
-                    }
-                  >
-                    {t("inbox.issue.add_assignees")}
-                  </button>
-                  <button
-                    className="btn secondary"
-                    type="button"
-                    disabled={Boolean(guardedReasonForSelected("issue_edit")) || mutationRunning}
-                    onClick={() =>
-                      openModal({
-                        kind: "issue_edit",
-                        item: selectedItem,
-                        field: "remove_assignees",
-                      })
-                    }
-                  >
-                    {t("inbox.issue.remove_assignees")}
-                  </button>
-                  <button
-                    className="btn secondary"
-                    type="button"
-                    disabled={Boolean(guardedReasonForSelected("issue_edit")) || mutationRunning}
-                    onClick={() =>
-                      openModal({
-                        kind: "issue_edit",
-                        item: selectedItem,
-                        field: "add_labels",
-                      })
-                    }
-                  >
-                    {t("inbox.issue.add_labels")}
-                  </button>
-                  <button
-                    className="btn secondary"
-                    type="button"
-                    disabled={Boolean(guardedReasonForSelected("issue_edit")) || mutationRunning}
-                    onClick={() =>
-                      openModal({
-                        kind: "issue_edit",
-                        item: selectedItem,
-                        field: "remove_labels",
-                      })
-                    }
-                  >
-                    {t("inbox.issue.remove_labels")}
-                  </button>
-                </div>
-              </section>
+              <>
+                <section className="inbox-group">
+                  <h3>{t("inbox.issue.quick_edit")}</h3>
+                  <div className="row gap-sm wrap">
+                    <button
+                      className="btn secondary"
+                      type="button"
+                      disabled={Boolean(guardedReasonForSelected("issue_edit")) || mutationRunning}
+                      onClick={() =>
+                        openModal({
+                          kind: "issue_edit",
+                          item: selectedItem,
+                          field: "add_assignees",
+                        })
+                      }
+                    >
+                      {t("inbox.issue.add_assignees")}
+                    </button>
+                    <button
+                      className="btn secondary"
+                      type="button"
+                      disabled={Boolean(guardedReasonForSelected("issue_edit")) || mutationRunning}
+                      onClick={() =>
+                        openModal({
+                          kind: "issue_edit",
+                          item: selectedItem,
+                          field: "remove_assignees",
+                        })
+                      }
+                    >
+                      {t("inbox.issue.remove_assignees")}
+                    </button>
+                    <button
+                      className="btn secondary"
+                      type="button"
+                      disabled={Boolean(guardedReasonForSelected("issue_edit")) || mutationRunning}
+                      onClick={() =>
+                        openModal({
+                          kind: "issue_edit",
+                          item: selectedItem,
+                          field: "add_labels",
+                        })
+                      }
+                    >
+                      {t("inbox.issue.add_labels")}
+                    </button>
+                    <button
+                      className="btn secondary"
+                      type="button"
+                      disabled={Boolean(guardedReasonForSelected("issue_edit")) || mutationRunning}
+                      onClick={() =>
+                        openModal({
+                          kind: "issue_edit",
+                          item: selectedItem,
+                          field: "remove_labels",
+                        })
+                      }
+                    >
+                      {t("inbox.issue.remove_labels")}
+                    </button>
+                  </div>
+                </section>
+
+                <section className="inbox-group">
+                  <h3>{t("inbox.issue.detail_title")}</h3>
+                  {issueDetailState.loading ? (
+                    <p className="info-text">{t("inbox.issue.loading")}</p>
+                  ) : null}
+                  {issueDetailState.error ? (
+                    <p className="error-text">{issueDetailState.error}</p>
+                  ) : null}
+                  {issueDetailState.detail ? (
+                    <>
+                      <div className="detail-grid">
+                        <span>
+                          {fmt("inbox.issue.detail_state", {
+                            state: issueDetailState.detail.state,
+                          })}
+                        </span>
+                        <span>
+                          {fmt("inbox.queue.meta.updated", {
+                            updated: formatUpdatedLabel(
+                              issueDetailState.detail.updatedAt ?? selectedItem.updatedAt,
+                            ),
+                          })}
+                        </span>
+                      </div>
+                      <div className="tag-row">
+                        {(issueDetailState.detail.labels ?? [])
+                          .map((entry) => asString(entry.name))
+                          .filter((entry): entry is string => Boolean(entry))
+                          .map((label) => (
+                            <span className="tag" key={`issue-label-${label}`}>
+                              {label}
+                            </span>
+                          ))}
+                        {(issueDetailState.detail.assignees ?? [])
+                          .map((entry) => asString(entry.login))
+                          .filter((entry): entry is string => Boolean(entry))
+                          .map((assignee) => (
+                            <span className="tag" key={`issue-assignee-${assignee}`}>
+                              @{assignee}
+                            </span>
+                          ))}
+                      </div>
+                      <article className="issue-body">
+                        {issueDetailState.detail.body || t("common.not_available")}
+                      </article>
+                    </>
+                  ) : null}
+                </section>
+
+                <section className="inbox-group">
+                  <h3>{t("inbox.issue.comments")}</h3>
+                  <div className="comment-list">
+                    {(issueDetailState.detail?.comments ?? []).map((comment, index) => (
+                      <article key={`${comment.id ?? "issue-comment"}-${index}`} className="comment-item">
+                        <header>
+                          <strong>{comment.author?.login ?? t("common.unknown")}</strong>
+                          <span>{formatUpdatedLabel(comment.createdAt ?? null)}</span>
+                        </header>
+                        <p>{comment.body}</p>
+                        <div className="row gap-sm wrap">
+                          <button
+                            type="button"
+                            className="btn secondary"
+                            disabled={Boolean(guardedReasonForSelected("comment")) || mutationRunning}
+                            onClick={() =>
+                              openModal({
+                                kind: "comment",
+                                item: selectedItem,
+                                initialBody: buildIssueReplyTemplate(comment),
+                              })
+                            }
+                          >
+                            {t("inbox.issue.reply")}
+                          </button>
+                          {comment.url ? (
+                            <a className="btn secondary" href={comment.url} target="_blank" rel="noreferrer">
+                              {t("inbox.open_github")}
+                            </a>
+                          ) : null}
+                        </div>
+                      </article>
+                    ))}
+                    {(issueDetailState.detail?.comments ?? []).length === 0 && !issueDetailState.loading ? (
+                      <p className="info-text">{t("inbox.issue.no_comments")}</p>
+                    ) : null}
+                  </div>
+                </section>
+              </>
             ) : null}
 
             {selectedItem.kind === "pr" ? (
@@ -1725,6 +1963,96 @@ export function InboxPage({
       ) : null}
     </section>
   );
+}
+
+function normalizeIssueDetail(value: IssueDetail): IssueDetail {
+  const record = asRecord(value);
+  const commentsRaw = Array.isArray(record.comments) ? record.comments : [];
+  const assigneesRaw = Array.isArray(record.assignees) ? record.assignees : [];
+  const labelsRaw = Array.isArray(record.labels) ? record.labels : [];
+
+  const comments: IssueCommentEntry[] = [];
+  for (const entry of commentsRaw) {
+    const item = asRecord(entry);
+    const body = asString(item.body);
+    if (!body) {
+      continue;
+    }
+
+    const authorRecord = asRecord(item.author);
+    const userRecord = asRecord(item.user);
+
+    comments.push({
+      id: asNumber(item.id) ?? asNumber(item.databaseId) ?? undefined,
+      body,
+      createdAt: asString(item.createdAt) ?? asString(item.created_at),
+      author: {
+        login:
+          asString(authorRecord.login) ??
+          asString(authorRecord.name) ??
+          asString(userRecord.login) ??
+          undefined,
+      },
+      url: asString(item.url) ?? asString(item.html_url),
+    });
+  }
+
+  const assignees = assigneesRaw
+    .map((entry) => {
+      const login = asString(asRecord(entry).login);
+      if (!login) {
+        return null;
+      }
+      return { login };
+    })
+    .filter((entry): entry is { login: string } => entry !== null);
+
+  const labels = labelsRaw
+    .map((entry) => {
+      const name = asString(asRecord(entry).name);
+      if (!name) {
+        return null;
+      }
+      return { name };
+    })
+    .filter((entry): entry is { name: string } => entry !== null);
+
+  return {
+    number: asNumber(record.number) ?? 0,
+    title: asString(record.title) ?? "",
+    state: asString(record.state) ?? "",
+    url: asString(record.url) ?? "",
+    body: asString(record.body) ?? "",
+    comments,
+    assignees,
+    labels,
+    updatedAt: asString(record.updatedAt) ?? asString(record.updated_at),
+  };
+}
+
+function buildIssueReplyTemplate(comment: IssueCommentEntry): string {
+  const mentionLogin = asString(asRecord(comment.author).login);
+  const mentionLine = mentionLogin ? `@${mentionLogin}` : "";
+  const quotedBody = comment.body
+    .split("\n")
+    .map((line) => `> ${line}`)
+    .join("\n");
+
+  return [mentionLine, quotedBody, ""].filter((line) => line.length > 0).join("\n\n");
+}
+
+function dedupeStrings(values: string[]): string[] {
+  const deduped: string[] = [];
+  for (const value of values) {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      continue;
+    }
+    if (!deduped.includes(trimmed)) {
+      deduped.push(trimmed);
+    }
+  }
+  return deduped;
 }
 
 function mapPullRequests(owner: string, repo: string, rows: unknown[]): InboxItem[] {
@@ -1936,6 +2264,7 @@ function buildModalConfig(
   selectedRepoKeys: string[],
   filters: InboxFilters,
   sortMode: SortMode,
+  issueEditAssigneeOptions: string[],
 ): {
   title: string;
   description?: string;
@@ -1993,6 +2322,7 @@ function buildModalConfig(
             type: "textarea",
             required: true,
             placeholder: t("inbox.modal.comment.placeholder"),
+            initialValue: modalState.initialBody ?? "",
           },
         ],
         confirmLabel: t("inbox.modal.comment.confirm"),
@@ -2036,6 +2366,37 @@ function buildModalConfig(
         confirmLabel: t("inbox.modal.merge.confirm"),
       };
     case "issue_edit":
+      if (
+        (modalState.field === "add_assignees" || modalState.field === "remove_assignees") &&
+        issueEditAssigneeOptions.length > 0
+      ) {
+        return {
+          title: t(`inbox.modal.issue_edit.${modalState.field}.title`),
+          description: fmt("inbox.modal.issue_edit.description", {
+            number: modalState.item.number,
+          }),
+          fields: [
+            {
+              name: "selected_values",
+              label: t("inbox.modal.issue_edit.select_values"),
+              type: "select",
+              multiple: true,
+              options: issueEditAssigneeOptions.map((value) => ({
+                label: value,
+                value,
+              })),
+            },
+            {
+              name: "manual_values",
+              label: t("inbox.modal.issue_edit.manual_values"),
+              type: "text",
+              placeholder: t("inbox.modal.issue_edit.placeholder"),
+            },
+          ],
+          confirmLabel: t("inbox.modal.issue_edit.confirm"),
+        };
+      }
+
       return {
         title: t(`inbox.modal.issue_edit.${modalState.field}.title`),
         description: fmt("inbox.modal.issue_edit.description", {

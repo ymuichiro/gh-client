@@ -4,7 +4,7 @@ use serde_json::Value;
 use crate::core::command_registry::CommandRegistry;
 use crate::core::error::AppError;
 
-pub const PAYLOAD_CONTRACT_VERSION: &str = "2026-03-04.v3";
+pub const PAYLOAD_CONTRACT_VERSION: &str = "2026-03-09.v4";
 
 pub const STABLE_COMMAND_IDS: &[&str] = &[
     "discussions.answer",
@@ -21,6 +21,7 @@ pub const STABLE_COMMAND_IDS: &[&str] = &[
     "issue.create",
     "issue.edit",
     "issue.list",
+    "issue.view",
     "issue.reopen",
     "pages.create",
     "pages.delete",

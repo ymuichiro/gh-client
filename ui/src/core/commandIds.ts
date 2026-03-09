@@ -1,4 +1,4 @@
-export const CONTRACT_VERSION = "2026-03-04.v3";
+export const CONTRACT_VERSION = "2026-03-09.v4";
 
 export const STABLE_COMMAND_IDS = [
   "discussions.answer",
@@ -15,6 +15,7 @@ export const STABLE_COMMAND_IDS = [
   "issue.create",
   "issue.edit",
   "issue.list",
+  "issue.view",
   "issue.reopen",
   "pages.create",
   "pages.delete",
