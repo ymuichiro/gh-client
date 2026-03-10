@@ -82,11 +82,22 @@ export function filterAndSortItems(
   filters: InboxFilters,
   sortMode: SortMode,
   slaHours: number,
+  currentLogin?: string | null,
 ): InboxItem[] {
+  const normalizedCurrentLogin = currentLogin?.trim().toLowerCase() ?? "";
+  const resolveSelfAlias = (rawValue: string): string => {
+    const trimmed = rawValue.trim();
+    if (trimmed.toLowerCase() !== "@me") {
+      return trimmed.toLowerCase();
+    }
+
+    return normalizedCurrentLogin;
+  };
+
   const lowerQuery = filters.query.trim().toLowerCase();
   const lowerLabel = filters.label.trim().toLowerCase();
-  const lowerAssignee = filters.assignee.trim().toLowerCase();
-  const lowerReviewer = filters.reviewer.trim().toLowerCase();
+  const lowerAssignee = resolveSelfAlias(filters.assignee);
+  const lowerReviewer = resolveSelfAlias(filters.reviewer);
   const withinHours = Number(filters.updatedWithinHours.trim());
 
   const filtered = items.filter((item) => {

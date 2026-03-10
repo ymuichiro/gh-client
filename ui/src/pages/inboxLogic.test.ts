@@ -97,6 +97,56 @@ describe("inboxLogic", () => {
     expect(result[0]?.id).toBe(stalePr.id);
   });
 
+  it("resolves @me alias for assignee/reviewer filters", () => {
+    const assignedToMe = buildItem({
+      id: "issue:acme/repo#2",
+      kind: "issue",
+      assignees: ["octocat"],
+      reviewers: [],
+    });
+    const reviewRequestedToMe = buildItem({
+      id: "pr:acme/repo#3",
+      kind: "pr",
+      assignees: [],
+      reviewers: ["octocat"],
+    });
+    const someoneElse = buildItem({
+      id: "pr:acme/repo#4",
+      kind: "pr",
+      assignees: ["someone-else"],
+      reviewers: ["someone-else"],
+    });
+
+    const assigneeFilters = {
+      ...initialInboxFilters(),
+      assignee: "@me",
+    };
+    const reviewerFilters = {
+      ...initialInboxFilters(),
+      reviewer: "@me",
+    };
+
+    const assigneeMatches = filterAndSortItems(
+      [assignedToMe, reviewRequestedToMe, someoneElse],
+      assigneeFilters,
+      "priority",
+      24,
+      "octocat",
+    );
+    const reviewerMatches = filterAndSortItems(
+      [assignedToMe, reviewRequestedToMe, someoneElse],
+      reviewerFilters,
+      "priority",
+      24,
+      "octocat",
+    );
+
+    expect(assigneeMatches.map((item) => item.id)).toContain(assignedToMe.id);
+    expect(assigneeMatches.map((item) => item.id)).not.toContain(someoneElse.id);
+    expect(reviewerMatches.map((item) => item.id)).toContain(reviewRequestedToMe.id);
+    expect(reviewerMatches.map((item) => item.id)).not.toContain(someoneElse.id);
+  });
+
   it("derives age and stale flag from updatedAt", () => {
     const timing = deriveItemTiming("2026-03-07T00:00:00Z", 24);
 

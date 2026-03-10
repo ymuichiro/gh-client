@@ -263,6 +263,7 @@ export function InboxPage({
   const [modalState, setModalState] = useState<ModalState>({ kind: "none" });
   const [modalRunning, setModalRunning] = useState(false);
   const [modalError, setModalError] = useState<string | null>(null);
+  const [currentLogin, setCurrentLogin] = useState<string | null>(null);
 
   const inboxFetchSeq = useRef(0);
   const prDetailFetchSeq = useRef(0);
@@ -288,6 +289,30 @@ export function InboxPage({
     (key: string, vars: Record<string, string | number>) => formatTemplate(t(key), vars),
     [t],
   );
+
+  useEffect(() => {
+    let active = true;
+
+    void executeCommand<unknown>("auth.status", {}, { permission: "viewer" })
+      .then((response) => {
+        if (!active) {
+          return;
+        }
+
+        const account = asString(asRecord(response.data).account);
+        setCurrentLogin(account ?? null);
+      })
+      .catch(() => {
+        if (!active) {
+          return;
+        }
+        setCurrentLogin(null);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     setSelectedRepoKeys((previous) => {
@@ -442,8 +467,8 @@ export function InboxPage({
   }, [filters, mode]);
 
   const filteredItems = useMemo(
-    () => filterAndSortItems(modeItems, effectiveFilters, sortMode, resolvedSlaHours),
-    [effectiveFilters, modeItems, resolvedSlaHours, sortMode],
+    () => filterAndSortItems(modeItems, effectiveFilters, sortMode, resolvedSlaHours, currentLogin),
+    [currentLogin, effectiveFilters, modeItems, resolvedSlaHours, sortMode],
   );
   const checkedItemIdSet = useMemo(() => new Set(checkedItemIds), [checkedItemIds]);
   const selectedBatchTargets = useMemo(
@@ -575,7 +600,7 @@ export function InboxPage({
       }
 
       return (
-        repoTargetsByKey.get(toRepoKey(item.owner, item.repo))?.viewerPermission ?? "write"
+        repoTargetsByKey.get(toRepoKey(item.owner, item.repo))?.viewerPermission ?? "viewer"
       );
     },
     [repoTargetsByKey],
