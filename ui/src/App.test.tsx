@@ -20,7 +20,9 @@ describe("App", () => {
     );
 
     expect(screen.getByText("gh-client")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "ダッシュボード" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Command Console" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Issues" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Pull Requests" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Settings" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /対象リポジトリ設定|Repository Scope/ })).toBeInTheDocument();
   });
 });

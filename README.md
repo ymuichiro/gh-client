@@ -1,54 +1,42 @@
 # gh-client
 
-`gh` (GitHub CLI) をバックエンドに使い、GitHub Web UI で提供される「自分のリポジトリ管理機能」を GUI から操作するためのアプリケーション設計ドキュメントです。
+`gh` (GitHub CLI) をバックエンドに使い、複数リポジトリの Issue / Pull Request 運用を高速化するデスクトップクライアントです。
 
 ## 目的
-- GitHub 操作を GUI で統合し、CLI に不慣れでも管理操作を完結できるようにする
-- `gh` と `gh api` を第一選択にし、必要に応じて `git` コマンドを併用する
-- GitHub UI の主要機能を、自分が管理するリポジトリ向けに段階的に網羅する
-- アプリ自身は認証情報を保持せず、ローカル `gh auth login` セッションに依存する
+- 複数リポジトリに散らばる Issue / PR を 1 つの作業面で横断管理する
+- close / approve / review などの日次運用を最短導線で実行できるようにする
+- 差分比較とレビュー文脈を保ったまま判断と操作を完結させる
+- 認証情報はアプリに保持せず、`gh auth login` セッションに依存する
+
+## 現在のプロダクトフォーカス
+- `Cross-Repo Review Console` として、Issue/PR の横断検索・一覧・操作に集中する
+- GitHub の全機能網羅は目標にしない（必要最小限を優先）
 
 ## ドキュメント
-- [機能リスト / GitHub UI 対応表](docs/features.md)
+- [アプリケーションコンセプト（絞り込み版）](docs/application-concept-focused.md)
+- [機能リスト（フォーカス後）](docs/features.md)
 - [システム設計](docs/architecture.md)
 - [バックエンド設計 (`gh` 実行基盤)](docs/backend.md)
 - [実装計画（マイルストーン）](docs/implementation-plan.md)
+- [ROADMAP](ROADMAP.md)
 - [Frontend Payload Contract](docs/payload-contract.md)
 - [Memory Log](docs/memory/README.md)
 - [TODO](TODO.md)
-- [ROADMAP](ROADMAP.md)
 - [AGENT 運用ガイド](AGENT.md)
 
+## 実装状況（資産）
+- backend は `repositories / pull_requests / issues / actions / releases / settings` を含む feature-based 実装済み
+- frontend は `Tauri + React + TypeScript` で command 契約に接続済み
+- `pull_requests` は review thread / diff files / raw diff まで backend 実装済み
+- Playwright E2E（mock/live）と Rust 側テストを整備済み
+
+注: 実装資産としては広範囲機能を保持しているが、今後の UI/UX と運用導線は Issue/PR 横断処理を優先する。
+
 ## 開発方針（要約）
-- まずは PR / Issue / Actions / Releases / Repository Settings を優先実装
-- すべての操作は「安全なコマンド実行ラッパー」経由で行う
-- API 結果は正規化し、UI はバックエンド API のみを参照する
-- 最優先は「不具合の検知容易性」と「セキュリティ安全性」とする
-- バックエンドを feature-based に先行完成し、フロントエンドは後付け実装する
-
-## 実装状況（バックエンド + フロントエンド）
-- `auth`: `gh auth status` の参照（ログイン状態/アカウント/scope）+ `gh api user/orgs` による organization 一覧取得
-- `repositories`: list/create/edit/delete, branch list/create/delete, commit list
-- `pull_requests`: list/view/create/edit/close/reopen/review/merge, issue/review comment list/create/reply, review thread list/resolve/unresolve, diff files/raw diff
-- `issues`: list/create/edit/comment/close/reopen
-- `actions`: workflow list/run list/run detail/run logs/rerun/cancel
-- `releases`: list/create/edit/delete, asset upload/delete
-- `settings`: collaborators, secrets, variables, webhooks, branch protection, deploy keys, dependabot alerts
-- `projects` (P2): project list/item list/item add
-- `discussions` (P2): category list/discussion list/create/close/answer
-- `wiki` (P2): wiki 有効状態の取得/更新
-- `pages` (P2): pages 設定の取得/作成/更新/削除
-- `rulesets` (P2): ruleset list/get/create/update/delete
-- `insights` (P2): traffic views/clones の取得
-
-フロントエンド:
-- `Tauri + React + TypeScript` 構成
-- 主要機能は feature ページ、長尾は `Command Console` で全 `STABLE_COMMAND_IDS` に到達可能
-- UI 言語: 日本語/英語の切替
-- 破壊系操作: 2段階確認モーダル
-- 実行履歴: ローカル監査ログ（request_id / command_id / status）
-- repo context: owner/repo は手入力ではなく選択式（organization/repository 候補を `gh` から取得）
-- 動的選択: branch/tag/PR番号/Issue番号/run_id は可能な範囲で候補選択に対応
+- Product Focus First: 横断 Issue/PR 処理に寄与する改善を最優先
+- Safety First: 破壊操作は確認フロー + 監査ログで保護
+- Backend Reliability First: `gh` 実行の安全ラッパーとエラー正規化を維持
+- Thin UI: 業務ロジックは backend 側に寄せ、UI は操作速度に集中
 
 ## ローカル起動
 

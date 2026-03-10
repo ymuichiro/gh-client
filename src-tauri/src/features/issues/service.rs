@@ -4,7 +4,10 @@ use crate::core::executor::{CommandExecutor, Runner};
 use crate::core::observability::TraceContext;
 use crate::core::policy_guard::{PolicyGuard, RepoPermission};
 
-use super::dto::{IssueCreated, IssueSummary, parse_issue_created_output, parse_issue_summaries};
+use super::dto::{
+    IssueCreated, IssueDetail, IssueSummary, parse_issue_created_output, parse_issue_detail,
+    parse_issue_summaries,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CreateIssueInput {
@@ -64,6 +67,10 @@ pub struct EditIssueInput {
     pub number: u64,
     pub title: Option<String>,
     pub body: Option<String>,
+    pub add_assignees: Vec<String>,
+    pub remove_assignees: Vec<String>,
+    pub add_labels: Vec<String>,
+    pub remove_labels: Vec<String>,
 }
 
 impl EditIssueInput {
@@ -75,9 +82,15 @@ impl EditIssueInput {
             return Err(AppError::validation("issue number must be greater than 0"));
         }
 
-        if self.title.is_none() && self.body.is_none() {
+        if self.title.is_none()
+            && self.body.is_none()
+            && self.add_assignees.is_empty()
+            && self.remove_assignees.is_empty()
+            && self.add_labels.is_empty()
+            && self.remove_labels.is_empty()
+        {
             return Err(AppError::validation(
-                "at least one of title/body must be provided",
+                "at least one update field must be provided",
             ));
         }
 
@@ -99,8 +112,26 @@ impl EditIssueInput {
             return Err(AppError::validation("body must not be empty when provided"));
         }
 
+        validate_non_empty_list("add_assignees", &self.add_assignees)?;
+        validate_non_empty_list("remove_assignees", &self.remove_assignees)?;
+        validate_non_empty_list("add_labels", &self.add_labels)?;
+        validate_non_empty_list("remove_labels", &self.remove_labels)?;
+
         Ok(())
     }
+}
+
+fn validate_non_empty_list(field_name: &str, values: &[String]) -> Result<(), AppError> {
+    for value in values {
+        if value.trim().is_empty() {
+            return Err(AppError::validation(format!(
+                "{} must not contain empty values",
+                field_name
+            )));
+        }
+    }
+
+    Ok(())
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -219,6 +250,32 @@ impl<R: Runner> IssuesService<R> {
         parse_issue_summaries(&output.stdout)
     }
 
+    pub fn view(
+        &self,
+        owner: &str,
+        repo: &str,
+        number: u64,
+        trace: &TraceContext,
+    ) -> Result<IssueDetail, AppError> {
+        if owner.trim().is_empty() || repo.trim().is_empty() {
+            return Err(AppError::validation("owner and repo are required"));
+        }
+        if number == 0 {
+            return Err(AppError::validation("issue number must be greater than 0"));
+        }
+
+        let args = vec![
+            number.to_string(),
+            "--repo".to_string(),
+            format!("{}/{}", owner, repo),
+            "--json".to_string(),
+            "number,title,state,url,author,labels,assignees,updatedAt,body,comments".to_string(),
+        ];
+        let req = self.registry.build_request("issue.view", &args)?;
+        let (output, _audit) = self.executor.execute(&req, trace)?;
+        parse_issue_detail(&output.stdout)
+    }
+
     pub fn create(
         &self,
         permission: RepoPermission,
@@ -324,6 +381,26 @@ impl<R: Runner> IssuesService<R> {
         if let Some(body) = input.body.as_ref() {
             args.push("--body".to_string());
             args.push(body.clone());
+        }
+
+        if !input.add_assignees.is_empty() {
+            args.push("--add-assignee".to_string());
+            args.push(input.add_assignees.join(","));
+        }
+
+        if !input.remove_assignees.is_empty() {
+            args.push("--remove-assignee".to_string());
+            args.push(input.remove_assignees.join(","));
+        }
+
+        if !input.add_labels.is_empty() {
+            args.push("--add-label".to_string());
+            args.push(input.add_labels.join(","));
+        }
+
+        if !input.remove_labels.is_empty() {
+            args.push("--remove-label".to_string());
+            args.push(input.remove_labels.join(","));
         }
 
         let req = self.registry.build_request("issue.edit", &args)?;
@@ -447,6 +524,38 @@ mod tests {
         assert_eq!(program, "gh");
         assert!(args.contains(&"issue".to_string()));
         assert!(args.contains(&"--repo".to_string()));
+    }
+
+    #[test]
+    fn view_executes_issue_view_command() {
+        let output = RawExecutionOutput {
+            exit_code: 0,
+            stdout: r#"{
+                "number": 11,
+                "title": "Bug",
+                "state": "OPEN",
+                "url": "https://github.com/octocat/hello/issues/11",
+                "body": "issue body",
+                "comments": []
+            }"#
+            .to_string(),
+            stderr: String::new(),
+        };
+        let (runner, state) = RecordingRunner::new(output);
+        let service = IssuesService::new(
+            CommandRegistry::with_defaults(),
+            CommandExecutor::new(runner, false),
+        );
+
+        let detail = service
+            .view("octocat", "hello", 11, &trace())
+            .expect("view should succeed");
+        assert_eq!(detail.number, 11);
+
+        let (_program, args) = state.last_call().expect("command should be called");
+        assert!(args.contains(&"issue".to_string()));
+        assert!(args.contains(&"view".to_string()));
+        assert!(args.contains(&"--json".to_string()));
     }
 
     #[test]
@@ -576,6 +685,10 @@ mod tests {
             number: 12,
             title: Some("new title".into()),
             body: Some("new body".into()),
+            add_assignees: vec!["@me".into()],
+            remove_assignees: vec!["hubot".into()],
+            add_labels: vec!["bug".into()],
+            remove_labels: vec!["triage".into()],
         };
 
         service
@@ -585,5 +698,9 @@ mod tests {
         let (_program, args) = state.last_call().expect("command should be called");
         assert!(args.contains(&"--title".to_string()));
         assert!(args.contains(&"--body".to_string()));
+        assert!(args.contains(&"--add-assignee".to_string()));
+        assert!(args.contains(&"--remove-assignee".to_string()));
+        assert!(args.contains(&"--add-label".to_string()));
+        assert!(args.contains(&"--remove-label".to_string()));
     }
 }

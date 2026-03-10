@@ -174,7 +174,7 @@ impl CommandRegistry {
                     "pr",
                     "list",
                     "--json",
-                    "number,title,state,url,isDraft,author,headRefName,baseRefName",
+                    "number,title,state,url,isDraft,author,headRefName,baseRefName,labels,assignees,updatedAt,reviewDecision,reviewRequests",
                 ],
                 CommandSafety::NonDestructive,
             ))
@@ -342,7 +342,21 @@ impl CommandRegistry {
             .register(CommandSpec::new(
                 "issue.list",
                 "gh",
-                &["issue", "list", "--json", "number,title,state,url,author"],
+                &[
+                    "issue",
+                    "list",
+                    "--json",
+                    "number,title,state,url,author,labels,assignees,updatedAt",
+                ],
+                CommandSafety::NonDestructive,
+            ))
+            .expect("default command should register");
+
+        registry
+            .register(CommandSpec::new(
+                "issue.view",
+                "gh",
+                &["issue", "view"],
                 CommandSafety::NonDestructive,
             ))
             .expect("default command should register");
@@ -946,7 +960,7 @@ mod tests {
     #[test]
     fn default_registry_contains_expected_commands() {
         let registry = CommandRegistry::with_defaults();
-        assert_eq!(registry.len(), 88);
+        assert_eq!(registry.len(), 89);
     }
 
     #[test]

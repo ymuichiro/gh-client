@@ -1,87 +1,71 @@
-# 機能リスト（GitHub UI 自身のリポジトリ操作）
+# 機能リスト（Cross-Repo Review Console）
 
 ## スコープ定義
-- 対象: 自分が `admin` / `maintain` / `write` 権限を持つリポジトリ
-- 非対象: 組織全体の課金・監査・SSO 管理など、リポジトリ境界を超える管理機能
+- 対象: 複数リポジトリにまたがる Issue / Pull Request の検索・一覧・レビュー操作
+- 対象ユーザー: `admin` / `maintain` / `write` 権限で日常的に triage/review する開発者
+- 非対象: GitHub 全領域の網羅（Actions/Releases/Settings 等を主導線にしない）
 
 ## 優先度
-- P0: 最初のリリースで必須
-- P1: 早期拡張
-- P2: 網羅性向上（後続）
+- P0: MVP で必須
+- P1: MVP 直後の高速化・運用性強化
+- P2: チーム運用拡張
 
-## GitHub UI 対応マトリクス
+## コア機能マトリクス
 | 領域 | UI 機能 | 優先度 | 実現方式 | 備考 |
 |---|---|---:|---|---|
-| リポジトリ一覧 | 自分のリポジトリ一覧/検索/フィルタ | P0 | `gh repo list --json` | owner, visibility, language 等で絞り込み |
-| リポジトリ作成 | 新規 repo 作成（public/private/template） | P0 | `gh repo create` | 初期化オプション対応 |
-| リポジトリ基本情報 | description/homepage/topics 編集 | P0 | `gh repo edit` + `gh api` | Topics は API 併用 |
-| Code | ブランチ一覧/作成/削除 | P0 | `gh api` + `git` | 既定ブランチ変更を含む |
-| Code | コミット履歴/差分閲覧 | P0 | `gh api` + `git log/show` | ローカル clone がある場合高速化 |
-| Pull Requests | 一覧/検索/詳細表示 | P0 | `gh pr list/view --json` | レビュー状態フィルタ |
-| Pull Requests | 作成（draft含む）/編集/クローズ | P0 | `gh pr create/edit/close` | テンプレート読み込み対応 |
-| Pull Requests | レビュー（approve/request changes/comment） | P0 | `gh pr review` | |
-| Pull Requests | マージ（merge/squash/rebase） | P0 | `gh pr merge` | ブランチ削除オプション |
-| Pull Requests | 会話（全体コメント/行コメント/返信） | P0 | `gh api` | issue comments + review comments を正規化 DTO で提供 |
-| Pull Requests | レビュースレッド管理（list/resolve/unresolve） | P0 | `gh api graphql` | review thread を thread 単位で取得・状態更新 |
-| Pull Requests | Diff 閲覧（構造化ファイル + raw unified） | P0 | `gh api` + `gh pr diff` | `patch` 欠損時は raw diff fallback |
-| Issues | 一覧/検索/詳細表示 | P0 | `gh issue list/view --json` | assignee, labels, milestone |
-| Issues | 作成/編集/コメント/close/reopen | P0 | `gh issue create/edit/comment/reopen/close` | |
-| Actions | Workflow 一覧/Run 一覧/ログ閲覧 | P0 | `gh workflow list` + `gh run list/view` | ログダウンロード |
-| Actions | Run 再実行/キャンセル | P0 | `gh run rerun/cancel` | |
-| Releases | Release 一覧/作成/編集/削除 | P0 | `gh release list/create/edit/delete` | Asset upload/delete 含む |
-| Settings | Collaborators 管理 | P1 | `gh api` | 招待/権限変更/削除 |
-| Settings | Secrets / Variables（Actions） | P1 | `gh secret` + `gh variable` | repo/environment 対応 |
-| Settings | Webhooks 管理 | P1 | `gh api` | create/update/ping/delete |
-| Settings | Branch Protection | P1 | `gh api` | rule の作成/更新 |
-| Settings | Deploy Keys | P1 | `gh api` | read-only/write 指定 |
-| Security | Dependabot alerts 一覧/対応導線 | P1 | `gh api` | dismiss/reopen は API |
-| Projects | リポジトリ紐づけ Project 操作 | P2 | `gh api graphql` | backend 実装済（read:project scope が必要） |
-| Discussions | 一覧/作成/回答/クローズ | P2 | `gh api graphql` | backend 実装済 |
-| Wiki | 有効化状態確認と導線 | P2 | `gh api` + 外部エディタ | backend 実装済（編集導線は後続） |
-| Insights | Traffic（views/clones）表示 | P2 | `gh api` | backend 実装済（read-only） |
-| Pages | Pages 設定（source/build） | P2 | `gh api` | backend 実装済 |
-| Rulesets | ルールセット管理 | P2 | `gh api` | backend 実装済 |
+| Cross-Repo Inbox | Issue / PR 横断一覧 | P0 | `gh issue list` / `gh pr list` + `gh api` | 複数 repo を統合して同一リスト表示 |
+| Cross-Repo Inbox | 横断検索・フィルタ | P0 | backend query 正規化 | owner/repo, state, label, assignee, reviewer, updated_at |
+| Cross-Repo Inbox | 保存ビュー | P0 | ローカル永続化 + 条件テンプレート | 例: 「自分宛レビュー待ち」 |
+| Triage | Issue quick action | P0 | `gh issue close/reopen/edit/comment` | 一覧から直接操作 |
+| Review | PR quick action | P0 | `gh pr review/close/reopen/merge` | approve/request changes/comment |
+| Review | PR 詳細 + 会話 | P0 | `gh pr view` + `gh api` | issue/review comment を統合表示 |
+| Diff | ファイル一覧 + unified diff | P0 | `gh api` + `gh pr diff` | `patch` 欠損時は raw diff fallback |
+| Workflow | キーボードショートカット | P1 | frontend shortcut layer | 主要操作を 1 キー実行 |
+| Workflow | 一括操作（安全ガード付き） | P1 | backend batch command | close/label/assignee など |
+| Queue | 優先度表示（滞留ハイライト） | P1 | ルール評価 + 表示属性 | SLA 風ルール（24h 超過など） |
+| Audit | 操作履歴トラッキング | P1 | 既存 audit log | だれが何を実行したか追跡 |
+| Team Ops | チーム別ビュー | P2 | saved view 拡張 | レビュアーグループ単位の可視化 |
+| Team Ops | 通知連携 | P2 | webhook/外部連携 | Slack など |
 
-## 画面単位の機能一覧（P0）
-1. Dashboard
-- 自分の repo 一覧
-- 最近の PR / Issue / Actions 実行状況
+## 画面構成（P0）
+1. Inbox（3レーン）
+- 左: 検索条件 / 保存ビュー
+- 中央: Issue/PR 横断一覧
+- 右: 詳細・会話・差分・操作
 
-2. Repository Home
-- 基本情報編集（description, topics, homepage, visibility）
-- README / デフォルトブランチ情報表示
+2. Diff Viewer
+- ファイルツリー
+- unified diff
+- コメント位置ジャンプ
 
-3. Pull Request
-- 一覧・詳細・レビュー・マージ
-- 会話（全体コメント/行コメント/返信）
-- レビュースレッドの resolve / unresolve
-- 差分表示（構造化 files + raw unified）、チェック結果表示
+3. Activity Log
+- 操作結果
+- 失敗理由の正規化表示
 
-4. Issues
-- 一覧・詳細・コメント
-- ラベル/マイルストーン/アサイン操作
+## 非機能要件
+- 速度: 初回一覧表示から最初の操作まで 30 秒未満を目標
+- 安全性: 破壊系操作は確認フロー + 監査ログ必須
+- 冪等性: 更新系 API は `request_id` で二重実行防止
+- 安定性: API 失敗時に指数バックオフ + 再試行
+- 可観測性: command 単位の成功率 / レイテンシを追跡
 
-5. Actions
-- workflow 一覧
-- run 詳細（jobs/logs）
-- rerun/cancel
-
-6. Releases
-- tag/release 管理
-- assets 管理
-
-## 非機能要件（機能実装に直結）
-- 操作ログ: 誰が何を実行したかをローカルに監査ログ化
-- 冪等性: 連打時の二重実行を防止（client request id）
-- レート制限対策: ETag/短期キャッシュ + 失敗時の指数バックオフ
-- 権限制御: 実行前に repo 権限 (`viewer/write/admin`) を確認
+## 非対象（明示）
+- Actions, Releases, Settings を中心とした管理コンソール化
+- 組織課金・監査・SSO 等の org 全体管理
+- コード編集 IDE 機能
 
 ## リリースフェーズ
-1. Phase 1（P0 Core）
-- Repo, PR, Issue, Actions, Release の CRUD と主要操作
+1. Phase F1（MVP）
+- 横断一覧 / 横断検索 / 保存ビュー
+- Issue close/reopen/comment
+- PR approve/request changes/comment/close
+- 基本 diff 閲覧
 
-2. Phase 2（P1 Admin）
-- Collaborators, Secrets/Variables, Webhooks, Branch Protection
+2. Phase F2（速度改善）
+- ショートカット強化
+- 一括操作
+- 滞留ハイライト
 
-3. Phase 3（P2 Coverage）
-- Discussions, Projects, Insights, Pages, Rulesets（backend 実装済）
+3. Phase F3（運用拡張）
+- チームビュー
+- 通知連携

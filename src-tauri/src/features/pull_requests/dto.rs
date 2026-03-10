@@ -9,6 +9,16 @@ pub struct PullRequestAuthor {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct PullRequestLabel {
+    pub name: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct PullRequestAssignee {
+    pub login: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct PullRequestSummary {
     pub number: u64,
     pub title: String,
@@ -21,6 +31,14 @@ pub struct PullRequestSummary {
     pub head_ref_name: String,
     #[serde(rename = "baseRefName")]
     pub base_ref_name: String,
+    pub labels: Option<Vec<PullRequestLabel>>,
+    pub assignees: Option<Vec<PullRequestAssignee>>,
+    #[serde(rename = "updatedAt")]
+    pub updated_at: Option<String>,
+    #[serde(rename = "reviewDecision")]
+    pub review_decision: Option<String>,
+    #[serde(rename = "reviewRequests")]
+    pub review_requests: Option<Value>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

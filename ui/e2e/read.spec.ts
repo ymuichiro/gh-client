@@ -1,92 +1,80 @@
 import { expect, test, type Page } from "@playwright/test";
 
-test("mock read flow across feature pages", async ({ page }) => {
+test("mock read flow for issues, pull requests and settings", async ({ page }) => {
   await page.goto("/");
-
-  await setContext(page, "mock-user", "gh-client", "admin");
-
-  await runCommand(page, "auth.status");
-  await runCommand(page, "repo.list");
-
-  await page.goto("/repositories");
-  await setContext(page, "mock-user", "gh-client", "admin");
-  await runCommand(page, "repo.branches.list");
-
-  await page.goto("/pull-requests");
-  await setContext(page, "mock-user", "gh-client", "admin");
-  await runCommand(page, "pr.list");
-
-  await page.goto("/issues");
-  await setContext(page, "mock-user", "gh-client", "admin");
-  await runCommand(page, "issue.list");
-
-  await page.goto("/actions");
-  await setContext(page, "mock-user", "gh-client", "admin");
-  await runCommand(page, "workflow.list");
-  await runCommand(page, "run.list");
-
-  await page.goto("/releases");
-  await setContext(page, "mock-user", "gh-client", "admin");
-  await runCommand(page, "release.list");
+  await expect(page.getByRole("heading", { name: /対象リポジトリ設定|Repository Scope/ })).toBeVisible();
+  await configureRepositoryScope(page, "mock-user", "gh-client");
+  await expect(page.getByRole("heading", { name: "Issues" })).toBeVisible();
 
   await page.goto("/settings");
-  await setContext(page, "mock-user", "gh-client", "admin");
-  await runCommand(page, "settings.collaborators.list");
+  await expect(page.getByRole("heading", { name: /対象リポジトリ設定|Repository Scope/ })).toBeVisible();
 
-  await page.goto("/p2");
-  await setContext(page, "mock-user", "gh-client", "admin");
-  await runCommand(page, "projects.list");
-  await runCommand(page, "discussions.list");
-  await runCommand(page, "insights.views.get");
+  await page.goto("/issues");
+  await expect(page.getByRole("heading", { name: "Issues" })).toBeVisible();
+  await page.getByRole("button", { name: "一覧を更新" }).click();
+  await expect(page.locator(".queue-item").first()).toBeVisible();
 
-  await page.goto("/console");
-  await expect(page.getByRole("heading", { name: "Command Console" })).toBeVisible();
-  await runCommand(page, "repo.branch.ref.get", { args: "repos/mock-user/gh-client/git/ref/heads/main" });
+  const mockUserIssue = page
+    .locator(".queue-item", { hasText: "mock-user/gh-client" })
+    .filter({ hasText: "Mock issue" })
+    .first();
+  const mockUserClosedIssue = page
+    .locator(".queue-item", { hasText: "mock-user/gh-client" })
+    .filter({ hasText: "Closed issue sample" })
+    .first();
+
+  await mockUserIssue.click();
+  await page.keyboard.press("a");
+  await expect(page.getByRole("heading", { name: "Approve 実行確認" })).toHaveCount(0);
+  await page.getByRole("button", { name: /一覧に戻る|Back to list/ }).click();
+
+  await mockUserClosedIssue.click();
+  await expect(page.getByRole("button", { name: "close (C)" })).toBeDisabled();
+  await page.keyboard.press("r");
+  await expect(page.getByRole("heading", { name: "コメント投稿" })).toBeVisible();
+  await page.getByRole("button", { name: "キャンセル" }).click();
+  await page.getByRole("button", { name: /一覧に戻る|Back to list/ }).click();
+
+  await mockUserIssue.locator('input[type="checkbox"]').check();
+  await page.getByRole("button", { name: /選択項目を close|Close selected/ }).click();
+  await expect(page.getByRole("heading", { name: "一括 close 実行" })).toBeVisible();
+
+  await page.getByRole("button", { name: "一括 close 実行" }).click();
+  await expect(page.locator(".inbox-modal-panel .error-text").first()).toBeVisible();
+
+  const token = (await page.getByText(/^BATCH:CLOSE:/).innerText()).trim();
+  await page.getByPlaceholder(/BATCH:CLOSE/).fill(token);
+  await page.getByRole("button", { name: "一括 close 実行" }).click();
+
+  await expect(page.getByText(/一括 close 完了:/)).toBeVisible();
+
+  await page.goto("/pull-requests");
+  await expect(page.getByRole("heading", { name: "Pull Requests" })).toBeVisible();
+  await page.getByRole("button", { name: "一覧を更新" }).click();
+  await expect(page.locator(".queue-item").first()).toBeVisible();
+
+  const mockUserPullRequest = page
+    .locator(".queue-item", { hasText: "mock-user/gh-client" })
+    .filter({ hasText: "Mock pull request" })
+    .first();
+
+  await mockUserPullRequest.click();
+  await page.keyboard.press("a");
+  await expect(page.getByRole("heading", { name: "Approve 実行確認" })).toBeVisible();
+  await page.getByRole("button", { name: "キャンセル" }).click();
+
+  await page.locator(".thread-item", { hasText: "ui/src/pages/InboxPage.tsx" }).click();
+  await expect(page.locator(".diff-file.active", { hasText: "ui/src/pages/InboxPage.tsx" })).toBeVisible();
 });
 
-async function setContext(page: Page, owner: string, repo: string, permission: "viewer" | "write" | "admin") {
-  const context = page.locator(".context-grid");
-  const ownerSelect = context.locator("select[data-context=\"owner\"]");
-  const repoSelect = context.locator("select[data-context=\"repo\"]");
-  const permissionSelect = context.locator("select[data-context=\"permission\"]");
-
-  await expect(ownerSelect).toBeVisible();
-  await expect.poll(async () => ownerSelect.locator("option").count()).toBeGreaterThan(1);
-
-  await ownerSelect.selectOption(owner);
-  await repoSelect.selectOption(repo);
-  await permissionSelect.selectOption(permission);
-}
-
-async function runCommand(
-  page: Page,
-  commandId: string,
-  fields: Record<string, string | boolean> = {},
-): Promise<void> {
-  const card = page.locator(`[data-testid=\"command-${commandId}\"]`);
-  await expect(card).toBeVisible({ timeout: 30_000 });
-
-  for (const [name, value] of Object.entries(fields)) {
-    const field = card.locator(`[data-field=\"${name}\"]`).first();
-
-    if (typeof value === "boolean") {
-      if (value) {
-        await field.check();
-      } else {
-        await field.uncheck();
-      }
-      continue;
-    }
-
-    const tagName = await field.evaluate((element) => element.tagName.toLowerCase());
-    if (tagName === "select") {
-      await field.selectOption(value);
-      continue;
-    }
-
-    await field.fill(value);
-  }
-
-  await card.getByRole("button", { name: /Execute|実行/ }).first().click();
-  await expect(card.getByRole("button", { name: /Response|レスポンス/ })).toBeVisible({ timeout: 30_000 });
+async function configureRepositoryScope(page: Page, owner: string, repo: string): Promise<void> {
+  await page.getByRole("button", { name: /org 候補を読み込む|Load organizations/ }).click();
+  await page.locator(".scope-option", { hasText: owner }).locator('input[type="checkbox"]').check();
+  await page
+    .getByRole("button", {
+      name: /repo 候補を更新|Update repositories from checked organizations/,
+    })
+    .click();
+  await page.locator(".scope-option", { hasText: repo }).locator('input[type="checkbox"]').check();
+  await page.getByRole("button", { name: /取得対象として確定|Confirm/ }).click();
 }

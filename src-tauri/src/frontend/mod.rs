@@ -78,6 +78,7 @@ pub const SUPPORTED_COMMAND_IDS: &[&str] = &[
     "pr.diff.files.list",
     "pr.diff.raw.get",
     "issue.list",
+    "issue.view",
     "issue.create",
     "issue.comment",
     "issue.edit",
@@ -531,6 +532,13 @@ impl<R: Runner + Clone> FrontendDispatcher<R> {
                         .list(&p.owner, &p.repo, p.limit, &trace(&request_id))?;
                 to_json(result)
             }
+            "issue.view" => {
+                let p: IssueNumberPayload = parse_payload(payload)?;
+                let result =
+                    self.issues_service()
+                        .view(&p.owner, &p.repo, p.number, &trace(&request_id))?;
+                to_json(result)
+            }
             "issue.create" => {
                 let p: IssueCreatePayload = parse_payload(payload)?;
                 let input = CreateIssueInput {
@@ -568,6 +576,10 @@ impl<R: Runner + Clone> FrontendDispatcher<R> {
                     number: p.number,
                     title: p.title,
                     body: p.body,
+                    add_assignees: p.add_assignees,
+                    remove_assignees: p.remove_assignees,
+                    add_labels: p.add_labels,
+                    remove_labels: p.remove_labels,
                 };
                 self.issues_service()
                     .edit(permission, &input, &trace(&request_id))?;
@@ -1621,6 +1633,13 @@ struct IssueCreatePayload {
 }
 
 #[derive(Debug, Deserialize)]
+struct IssueNumberPayload {
+    owner: String,
+    repo: String,
+    number: u64,
+}
+
+#[derive(Debug, Deserialize)]
 struct IssueCommentPayload {
     owner: String,
     repo: String,
@@ -1635,6 +1654,14 @@ struct IssueEditPayload {
     number: u64,
     title: Option<String>,
     body: Option<String>,
+    #[serde(default)]
+    add_assignees: Vec<String>,
+    #[serde(default)]
+    remove_assignees: Vec<String>,
+    #[serde(default)]
+    add_labels: Vec<String>,
+    #[serde(default)]
+    remove_labels: Vec<String>,
 }
 
 #[derive(Debug, Deserialize)]

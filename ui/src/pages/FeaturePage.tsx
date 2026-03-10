@@ -3,15 +3,7 @@ import { listCommandsForRoute } from "../core/pageCommands";
 import type { PageSharedProps } from "./types";
 
 interface FeaturePageProps extends PageSharedProps {
-  route:
-    | "repositories"
-    | "pull_requests"
-    | "issues"
-    | "actions"
-    | "releases"
-    | "settings"
-    | "p2"
-    | "console";
+  route: "settings";
   title: string;
   description?: string;
 }
