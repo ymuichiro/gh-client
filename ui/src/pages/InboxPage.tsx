@@ -1,12 +1,42 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  AlignJustify,
+  ArrowLeft,
+  Check,
+  CircleX,
+  Code2,
+  Eraser,
+  ExternalLink,
+  GitMerge,
+  MessageSquare,
+  RefreshCw,
+  RotateCcw,
+  Save,
+  SplitSquareHorizontal,
+  Tag,
+  Trash2,
+  Undo2,
+  UserMinus,
+  UserPlus,
+} from "lucide-react";
 
 import { type CommandExecutionEvent } from "../components/CommandForm";
+import { IconButton } from "../components/IconButton";
 import { InboxActionModal, type InboxActionModalField } from "../components/InboxActionModal";
+import { LoadingIndicator } from "../components/LoadingIndicator";
+import type { DiffViewMode } from "../components/DiffSyntaxPreview";
 import type { CommandId } from "../core/commandIds";
 import { ExecutionError, executeCommand } from "../core/executor";
+import { openExternalUrl } from "../core/externalOpen";
 import { loadHistory } from "../core/history";
 import { useI18n } from "../core/i18n";
 import type { CommandPermission, FrontendInvokeError } from "../core/types";
+import {
+  INBOX_CACHE_TTL_MS,
+  isInboxCacheStale,
+  readInboxCache,
+  writeInboxCache,
+} from "./inboxCache";
 import {
   type ActionGuardReason,
   type BatchExecutionOutcome,
@@ -31,12 +61,16 @@ import {
   normalizeMergeMethod,
   parseCommaSeparated,
   parsePositiveNumber,
-  selectBatchCloseTargets,
   toRepoKey,
 } from "./inboxLogic";
 
 const MAX_CONCURRENT_REPO_FETCH = 4;
 const BATCH_PREVIEW_LIMIT = 40;
+const LazyDiffSyntaxPreview = lazy(() =>
+  import("../components/DiffSyntaxPreview").then((module) => ({
+    default: module.DiffSyntaxPreview,
+  })),
+);
 
 interface RepoTarget {
   owner: string;
@@ -214,9 +248,12 @@ export function InboxPage({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fetchWarnings, setFetchWarnings] = useState<string[]>([]);
+  const [lastLoadedAt, setLastLoadedAt] = useState<number | null>(null);
   const [selectedItemId, setSelectedItemId] = useState("");
+  const [checkedItemIds, setCheckedItemIds] = useState<string[]>([]);
   const [detailOpen, setDetailOpen] = useState(false);
   const [selectedDiffPath, setSelectedDiffPath] = useState<string | null>(null);
+  const [diffViewMode, setDiffViewMode] = useState<DiffViewMode>("inline");
   const [mutationRunning, setMutationRunning] = useState(false);
   const [batchRunning, setBatchRunning] = useState(false);
   const [batchProgress, setBatchProgress] = useState<BatchProgress | null>(null);
@@ -318,7 +355,7 @@ export function InboxPage({
   );
 
   const loadRepoInbox = useCallback(
-    async (target: RepoTarget): Promise<RepoFetchResult> => {
+    async (target: RepoTarget, forceRefresh: boolean): Promise<RepoFetchResult> => {
       const permission = target.viewerPermission ?? "viewer";
       const repoKey = toRepoKey(target.owner, target.repo);
 
@@ -326,7 +363,12 @@ export function InboxPage({
         const prSettled = await Promise.allSettled([
           executeCommand<unknown[]>(
             "pr.list",
-            { owner: target.owner, repo: target.repo, limit: 100 },
+            {
+              owner: target.owner,
+              repo: target.repo,
+              limit: 100,
+              force_refresh: forceRefresh,
+            },
             { permission },
           ),
         ]);
@@ -351,7 +393,12 @@ export function InboxPage({
       const issueSettled = await Promise.allSettled([
         executeCommand<unknown[]>(
           "issue.list",
-          { owner: target.owner, repo: target.repo, limit: 100 },
+          {
+            owner: target.owner,
+            repo: target.repo,
+            limit: 100,
+            force_refresh: forceRefresh,
+          },
           { permission },
         ),
       ]);
@@ -398,12 +445,38 @@ export function InboxPage({
     () => filterAndSortItems(modeItems, effectiveFilters, sortMode, resolvedSlaHours),
     [effectiveFilters, modeItems, resolvedSlaHours, sortMode],
   );
+  const checkedItemIdSet = useMemo(() => new Set(checkedItemIds), [checkedItemIds]);
+  const selectedBatchTargets = useMemo(
+    () => filteredItems.filter((item) => checkedItemIdSet.has(item.id)),
+    [checkedItemIdSet, filteredItems],
+  );
 
-  const refreshInbox = useCallback(async () => {
+  const applyInboxSnapshot = useCallback(
+    (nextItems: InboxItem[], warnings: string[], updatedAt: number | null) => {
+      setItems(nextItems);
+      setFetchWarnings(warnings);
+      setLastLoadedAt(updatedAt);
+
+      if (nextItems.length === 0 && warnings.length > 0) {
+        setError(t("inbox.error.fetch_all_failed"));
+        return;
+      }
+
+      setError(null);
+    },
+    [t],
+  );
+
+  const refreshInbox = useCallback(async (options?: { force?: boolean }) => {
+    const forceRefresh = options?.force ?? false;
     const requestSeq = ++inboxFetchSeq.current;
     setLoading(true);
     setError(null);
-    setFetchWarnings([]);
+
+    await waitForNextFrame();
+    if (requestSeq !== inboxFetchSeq.current) {
+      return;
+    }
 
     try {
       const selectedTargets = selectedRepoKeys
@@ -411,14 +484,14 @@ export function InboxPage({
         .filter((target): target is RepoTarget => Boolean(target));
 
       if (selectedTargets.length === 0) {
-        setItems([]);
+        applyInboxSnapshot([], [], Date.now());
         return;
       }
 
       const fetchResults = await mapWithConcurrency(
         selectedTargets,
         MAX_CONCURRENT_REPO_FETCH,
-        loadRepoInbox,
+        (target) => loadRepoInbox(target, forceRefresh),
       );
 
       if (requestSeq !== inboxFetchSeq.current) {
@@ -430,15 +503,13 @@ export function InboxPage({
         result.errors.map((message) => `${result.key}: ${message}`),
       );
 
-      setItems(nextItems);
-
-      if (warnings.length > 0) {
-        setFetchWarnings(warnings);
-      }
-
-      if (nextItems.length === 0 && warnings.length > 0) {
-        setError(t("inbox.error.fetch_all_failed"));
-      }
+      const updatedAt = Date.now();
+      applyInboxSnapshot(nextItems, warnings, updatedAt);
+      writeInboxCache(mode, selectedRepoKeys, {
+        items: nextItems,
+        warnings,
+        updatedAt,
+      });
     } catch (cause) {
       if (requestSeq !== inboxFetchSeq.current) {
         return;
@@ -449,11 +520,45 @@ export function InboxPage({
         setLoading(false);
       }
     }
-  }, [loadRepoInbox, repoTargetsByKey, selectedRepoKeys, t]);
+  }, [applyInboxSnapshot, loadRepoInbox, mode, repoTargetsByKey, selectedRepoKeys]);
 
   useEffect(() => {
-    void refreshInbox();
-  }, [refreshInbox]);
+    if (selectedRepoKeys.length === 0) {
+      applyInboxSnapshot([], [], null);
+      return;
+    }
+
+    const cached = readInboxCache(mode, selectedRepoKeys);
+    if (cached) {
+      applyInboxSnapshot(cached.items, cached.warnings, cached.updatedAt);
+      if (isInboxCacheStale(cached)) {
+        void refreshInbox({ force: true });
+      }
+      return;
+    }
+
+    void refreshInbox({ force: true });
+  }, [applyInboxSnapshot, mode, refreshInbox, selectedRepoKeys]);
+
+  useEffect(() => {
+    if (selectedRepoKeys.length === 0) {
+      return;
+    }
+
+    const timer = window.setInterval(() => {
+      if (loading || !lastLoadedAt) {
+        return;
+      }
+
+      if (Date.now() - lastLoadedAt < INBOX_CACHE_TTL_MS) {
+        return;
+      }
+
+      void refreshInbox({ force: true });
+    }, 30_000);
+
+    return () => window.clearInterval(timer);
+  }, [lastLoadedAt, loading, refreshInbox, selectedRepoKeys.length]);
 
   const selectedItem = useMemo(() => {
     if (!selectedItemId) {
@@ -488,6 +593,11 @@ export function InboxPage({
     setSelectedItemId("");
     setDetailOpen(false);
   }, [selectedItem, selectedItemId]);
+
+  useEffect(() => {
+    const modeItemIdSet = new Set(modeItems.map((item) => item.id));
+    setCheckedItemIds((current) => current.filter((id) => modeItemIdSet.has(id)));
+  }, [modeItems]);
 
   const selectedPermission = useMemo(() => {
     return resolvePermissionForItem(selectedItem);
@@ -651,7 +761,7 @@ export function InboxPage({
       try {
         await executeMutation(request.commandId, request.payload, request.permission);
         if (refreshAfter) {
-          await refreshInbox();
+          await refreshInbox({ force: true });
         }
         return true;
       } catch (cause) {
@@ -749,7 +859,10 @@ export function InboxPage({
   }, [modalRunning]);
 
   const runBatchClose = useCallback(
-    async (targets: InboxItem[]): Promise<BatchExecutionResult> => {
+    async (
+      targets: InboxItem[],
+      issueCloseReason: "completed" | "not planned",
+    ): Promise<BatchExecutionResult> => {
       let result = createBatchExecutionResult(targets.length);
 
       setBatchRunning(true);
@@ -775,7 +888,7 @@ export function InboxPage({
                 owner: target.owner,
                 repo: target.repo,
                 number: target.number,
-                reason: "completed",
+                reason: issueCloseReason,
               },
               permission,
             );
@@ -801,7 +914,11 @@ export function InboxPage({
       setBatchRunning(false);
       setBatchProgress(null);
       setBatchResult(result);
-      await refreshInbox();
+      setCheckedItemIds((current) => {
+        const targetIdSet = new Set(targets.map((target) => target.id));
+        return current.filter((id) => !targetIdSet.has(id));
+      });
+      await refreshInbox({ force: true });
       return result;
     },
     [executeMutation, refreshInbox, resolvePermissionForItem],
@@ -1013,7 +1130,8 @@ export function InboxPage({
             return;
           }
           case "batch_close": {
-            await runBatchClose(modal.targets);
+            const issueReasonRaw = values.issue_reason === "not planned" ? "not planned" : "completed";
+            await runBatchClose(modal.targets, issueReasonRaw);
             setModalState({ kind: "none" });
             return;
           }
@@ -1039,14 +1157,14 @@ export function InboxPage({
   );
 
   const openBatchCloseModal = useCallback(() => {
-    const targets = selectBatchCloseTargets(filteredItems);
+    const targets = selectedBatchTargets;
     if (targets.length === 0) {
-      setBatchResult(createBatchExecutionResult(0));
+      setError(t("inbox.batch.no_selection"));
       return;
     }
 
     openModal({ kind: "batch_close", targets });
-  }, [filteredItems, openModal]);
+  }, [openModal, selectedBatchTargets, t]);
 
   useEffect(() => {
     const hasModal = modalState.kind !== "none";
@@ -1189,7 +1307,7 @@ export function InboxPage({
   );
 
   return (
-    <section className="inbox-page">
+    <section className="inbox-page loading-host">
       <aside className="inbox-panel inbox-left">
         <header className="section-header">
           <h2>{title}</h2>
@@ -1197,16 +1315,15 @@ export function InboxPage({
         </header>
 
         <div className="row gap-sm">
-          <button
-            className="btn secondary"
-            type="button"
+          <IconButton
+            icon={RefreshCw}
+            label={loading ? t("inbox.refreshing") : t("inbox.refresh")}
+            variant="secondary"
             onClick={() => {
-              void refreshInbox();
+              void refreshInbox({ force: true });
             }}
             disabled={loading}
-          >
-            {loading ? t("inbox.refreshing") : t("inbox.refresh")}
-          </button>
+          />
         </div>
 
         <section className="inbox-group">
@@ -1363,24 +1480,22 @@ export function InboxPage({
         <section className="inbox-group">
           <h3>{t("inbox.section.saved_views")}</h3>
           <div className="row gap-sm">
-            <button
-              type="button"
-              className="btn secondary"
+            <IconButton
+              icon={Save}
+              label={t("inbox.saved.save_current")}
+              variant="secondary"
               onClick={() => openModal({ kind: "save_view" })}
-            >
-              {t("inbox.saved.save_current")}
-            </button>
-            <button
-              type="button"
-              className="btn secondary"
+            />
+            <IconButton
+              icon={RotateCcw}
+              label={t("inbox.saved.reset")}
+              variant="secondary"
               onClick={() => {
                 setFilters(initialInboxFilters());
                 setSortMode("priority");
                 setSelectedViewId("");
               }}
-            >
-              {t("inbox.saved.reset")}
-            </button>
+            />
           </div>
 
           <div className="saved-views">
@@ -1407,9 +1522,10 @@ export function InboxPage({
                   {view.name}
                 </button>
                 {!view.builtIn ? (
-                  <button
-                    type="button"
-                    className="btn secondary"
+                  <IconButton
+                    icon={Trash2}
+                    label={t("inbox.saved.delete")}
+                    variant="secondary"
                     onClick={() => {
                       setCustomViews((current) =>
                         current.filter((item) => item.id !== view.id),
@@ -1418,9 +1534,7 @@ export function InboxPage({
                         setSelectedViewId("");
                       }
                     }}
-                  >
-                    {t("inbox.saved.delete")}
-                  </button>
+                  />
                 ) : null}
               </div>
             ))}
@@ -1448,32 +1562,57 @@ export function InboxPage({
           <p>{fmt("inbox.queue.count", { count: filteredItems.length })}</p>
         </header>
 
+        {loading ? <LoadingIndicator size="sm" label={t("inbox.loading")} /> : null}
+
         <div className="row gap-sm wrap">
-          <button
-            type="button"
-            className="btn secondary"
+          <IconButton
+            icon={CircleX}
+            label={t("inbox.batch.execute_selected")}
+            variant="secondary"
             onClick={openBatchCloseModal}
-            disabled={batchRunning || filteredItems.length === 0}
-          >
-            {t("inbox.batch.execute")}
-          </button>
-          <button
-            type="button"
-            className="btn secondary"
+            disabled={batchRunning || selectedBatchTargets.length === 0}
+          />
+          <IconButton
+            icon={Check}
+            label={t("inbox.batch.select_visible")}
+            variant="secondary"
+            onClick={() => {
+              setCheckedItemIds((current) => {
+                const selected = new Set(current);
+                for (const item of filteredItems) {
+                  selected.add(item.id);
+                }
+                return [...selected];
+              });
+            }}
+            disabled={filteredItems.length === 0}
+          />
+          <IconButton
+            icon={RotateCcw}
+            label={t("inbox.batch.clear_selection")}
+            variant="secondary"
+            onClick={() => setCheckedItemIds([])}
+            disabled={checkedItemIds.length === 0}
+          />
+          <IconButton
+            icon={Eraser}
+            label={t("inbox.batch.clear")}
+            variant="secondary"
             onClick={() => setBatchResult(null)}
             disabled={!batchResult}
-          >
-            {t("inbox.batch.clear")}
-          </button>
+          />
         </div>
 
         {batchRunning && batchProgress ? (
-          <p className="info-text">
-            {fmt("inbox.batch.progress", {
-              processed: batchProgress.processed,
-              total: batchProgress.total,
-            })}
-          </p>
+          <LoadingIndicator
+            size="sm"
+            label={
+              fmt("inbox.batch.progress", {
+                processed: batchProgress.processed,
+                total: batchProgress.total,
+              })
+            }
+          />
         ) : null}
 
         {batchResult ? (
@@ -1496,24 +1635,52 @@ export function InboxPage({
             ))}
           </div>
         ) : null}
-        {loading ? <p className="info-text">{t("inbox.loading")}</p> : null}
-
         <div className="queue-list">
           {filteredItems.map((item) => {
             const timing = deriveItemTiming(item.updatedAt, resolvedSlaHours);
             return (
-              <button
+              <article
                 key={item.id}
-                type="button"
                 className={
                   detailOpen && item.id === selectedItem?.id ? "queue-item active" : "queue-item"
                 }
+                role="button"
+                tabIndex={0}
                 onClick={() => {
                   setSelectedItemId(item.id);
                   setDetailOpen(true);
                 }}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    setSelectedItemId(item.id);
+                    setDetailOpen(true);
+                  }
+                }}
               >
                 <div className="queue-item-header">
+                  <label
+                    className="queue-item-check"
+                    onClick={(event) => event.stopPropagation()}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={checkedItemIdSet.has(item.id)}
+                      onKeyDown={(event) => event.stopPropagation()}
+                      onChange={(event) => {
+                        setCheckedItemIds((current) => {
+                          if (event.target.checked) {
+                            if (current.includes(item.id)) {
+                              return current;
+                            }
+                            return [...current, item.id];
+                          }
+                          return current.filter((id) => id !== item.id);
+                        });
+                      }}
+                      aria-label={`${item.kind.toUpperCase()} #${item.number}`}
+                    />
+                  </label>
                   <span className="tag">{item.kind.toUpperCase()}</span>
                   <span className="tag">
                     {item.owner}/{item.repo}
@@ -1558,7 +1725,7 @@ export function InboxPage({
                     </span>
                   ))}
                 </div>
-              </button>
+              </article>
             );
           })}
         </div>
@@ -1578,13 +1745,12 @@ export function InboxPage({
             onClick={(event) => event.stopPropagation()}
           >
             <div className="row gap-sm wrap">
-              <button
-                className="btn secondary"
-                type="button"
+              <IconButton
+                icon={ArrowLeft}
+                label={t("inbox.detail.back")}
+                variant="secondary"
                 onClick={() => setDetailOpen(false)}
-              >
-                {t("inbox.detail.back")}
-              </button>
+              />
             </div>
             <header className="section-header">
               <h2>
@@ -1596,40 +1762,42 @@ export function InboxPage({
             </header>
 
             <div className="row gap-sm wrap">
-              <a className="btn secondary" href={selectedItem.url} target="_blank" rel="noreferrer">
-                {t("inbox.open_github")}
-              </a>
-              <button
-                className="btn secondary"
-                type="button"
+              <IconButton
+                icon={ExternalLink}
+                label={t("inbox.open_github")}
+                variant="secondary"
+                onClick={() => {
+                  void openExternalUrl(selectedItem.url);
+                }}
+              />
+              <IconButton
+                icon={Undo2}
+                label={t("inbox.action.reopen")}
+                variant="secondary"
                 disabled={Boolean(guardedReasonForSelected("reopen")) || mutationRunning}
                 title={guardedReasonForSelected("reopen") ? actionGuardMessage(t, guardedReasonForSelected("reopen") as ActionGuardReason) : undefined}
                 onClick={() => {
                   void reopenSelected();
                 }}
-              >
-                {t("inbox.action.reopen")}
-              </button>
-              <button
-                className="btn danger"
-                type="button"
+              />
+              <IconButton
+                icon={CircleX}
+                label={t("inbox.action.close_shortcut")}
+                variant="danger"
                 disabled={Boolean(guardedReasonForSelected("close")) || mutationRunning}
                 title={guardedReasonForSelected("close") ? actionGuardMessage(t, guardedReasonForSelected("close") as ActionGuardReason) : undefined}
                 onClick={() => {
                   void closeSelected();
                 }}
-              >
-                {t("inbox.action.close_shortcut")}
-              </button>
-              <button
-                className="btn secondary"
-                type="button"
+              />
+              <IconButton
+                icon={MessageSquare}
+                label={t("inbox.action.comment_shortcut")}
+                variant="secondary"
                 disabled={Boolean(guardedReasonForSelected("comment")) || mutationRunning}
                 title={guardedReasonForSelected("comment") ? actionGuardMessage(t, guardedReasonForSelected("comment") as ActionGuardReason) : undefined}
                 onClick={() => openModal({ kind: "comment", item: selectedItem })}
-              >
-                {t("inbox.action.comment_shortcut")}
-              </button>
+              />
             </div>
 
             {selectedItem.kind === "issue" ? (
@@ -1637,9 +1805,10 @@ export function InboxPage({
                 <section className="inbox-group">
                   <h3>{t("inbox.issue.quick_edit")}</h3>
                   <div className="row gap-sm wrap">
-                    <button
-                      className="btn secondary"
-                      type="button"
+                    <IconButton
+                      icon={UserPlus}
+                      label={t("inbox.issue.add_assignees")}
+                      variant="secondary"
                       disabled={Boolean(guardedReasonForSelected("issue_edit")) || mutationRunning}
                       onClick={() =>
                         openModal({
@@ -1648,12 +1817,11 @@ export function InboxPage({
                           field: "add_assignees",
                         })
                       }
-                    >
-                      {t("inbox.issue.add_assignees")}
-                    </button>
-                    <button
-                      className="btn secondary"
-                      type="button"
+                    />
+                    <IconButton
+                      icon={UserMinus}
+                      label={t("inbox.issue.remove_assignees")}
+                      variant="secondary"
                       disabled={Boolean(guardedReasonForSelected("issue_edit")) || mutationRunning}
                       onClick={() =>
                         openModal({
@@ -1662,12 +1830,11 @@ export function InboxPage({
                           field: "remove_assignees",
                         })
                       }
-                    >
-                      {t("inbox.issue.remove_assignees")}
-                    </button>
-                    <button
-                      className="btn secondary"
-                      type="button"
+                    />
+                    <IconButton
+                      icon={Tag}
+                      label={t("inbox.issue.add_labels")}
+                      variant="secondary"
                       disabled={Boolean(guardedReasonForSelected("issue_edit")) || mutationRunning}
                       onClick={() =>
                         openModal({
@@ -1676,12 +1843,11 @@ export function InboxPage({
                           field: "add_labels",
                         })
                       }
-                    >
-                      {t("inbox.issue.add_labels")}
-                    </button>
-                    <button
-                      className="btn secondary"
-                      type="button"
+                    />
+                    <IconButton
+                      icon={Trash2}
+                      label={t("inbox.issue.remove_labels")}
+                      variant="secondary"
                       disabled={Boolean(guardedReasonForSelected("issue_edit")) || mutationRunning}
                       onClick={() =>
                         openModal({
@@ -1690,16 +1856,14 @@ export function InboxPage({
                           field: "remove_labels",
                         })
                       }
-                    >
-                      {t("inbox.issue.remove_labels")}
-                    </button>
+                    />
                   </div>
                 </section>
 
                 <section className="inbox-group">
                   <h3>{t("inbox.issue.detail_title")}</h3>
                   {issueDetailState.loading ? (
-                    <p className="info-text">{t("inbox.issue.loading")}</p>
+                    <LoadingIndicator size="sm" label={t("inbox.issue.loading")} />
                   ) : null}
                   {issueDetailState.error ? (
                     <p className="error-text">{issueDetailState.error}</p>
@@ -1756,9 +1920,10 @@ export function InboxPage({
                         </header>
                         <p>{comment.body}</p>
                         <div className="row gap-sm wrap">
-                          <button
-                            type="button"
-                            className="btn secondary"
+                          <IconButton
+                            icon={MessageSquare}
+                            label={t("inbox.issue.reply")}
+                            variant="secondary"
                             disabled={Boolean(guardedReasonForSelected("comment")) || mutationRunning}
                             onClick={() =>
                               openModal({
@@ -1767,13 +1932,16 @@ export function InboxPage({
                                 initialBody: buildIssueReplyTemplate(comment),
                               })
                             }
-                          >
-                            {t("inbox.issue.reply")}
-                          </button>
+                          />
                           {comment.url ? (
-                            <a className="btn secondary" href={comment.url} target="_blank" rel="noreferrer">
-                              {t("inbox.open_github")}
-                            </a>
+                            <IconButton
+                              icon={ExternalLink}
+                              label={t("inbox.open_github")}
+                              variant="secondary"
+                              onClick={() => {
+                                void openExternalUrl(comment.url ?? "");
+                              }}
+                            />
                           ) : null}
                         </div>
                       </article>
@@ -1791,41 +1959,37 @@ export function InboxPage({
                 <section className="inbox-group">
                   <h3>{t("inbox.pr.quick_actions")}</h3>
                   <div className="row gap-sm wrap">
-                    <button
-                      className="btn"
-                      type="button"
+                    <IconButton
+                      icon={Check}
+                      label={t("inbox.pr.approve_shortcut")}
+                      variant="primary"
                       disabled={Boolean(guardedReasonForSelected("approve")) || mutationRunning}
                       title={guardedReasonForSelected("approve") ? actionGuardMessage(t, guardedReasonForSelected("approve") as ActionGuardReason) : undefined}
                       onClick={() => openModal({ kind: "approve", item: selectedItem })}
-                    >
-                      {t("inbox.pr.approve_shortcut")}
-                    </button>
-                    <button
-                      className="btn secondary"
-                      type="button"
+                    />
+                    <IconButton
+                      icon={CircleX}
+                      label={t("inbox.pr.request_changes")}
+                      variant="secondary"
                       disabled={Boolean(guardedReasonForSelected("request_changes")) || mutationRunning}
                       title={guardedReasonForSelected("request_changes") ? actionGuardMessage(t, guardedReasonForSelected("request_changes") as ActionGuardReason) : undefined}
                       onClick={() => openModal({ kind: "request_changes", item: selectedItem })}
-                    >
-                      {t("inbox.pr.request_changes")}
-                    </button>
-                    <button
-                      className="btn secondary"
-                      type="button"
+                    />
+                    <IconButton
+                      icon={GitMerge}
+                      label={t("inbox.pr.merge")}
+                      variant="secondary"
                       disabled={Boolean(guardedReasonForSelected("merge")) || mutationRunning}
                       title={guardedReasonForSelected("merge") ? actionGuardMessage(t, guardedReasonForSelected("merge") as ActionGuardReason) : undefined}
                       onClick={() => openModal({ kind: "merge", item: selectedItem })}
-                    >
-                      {t("inbox.pr.merge")}
-                    </button>
-                    <button
-                      className="btn secondary"
-                      type="button"
+                    />
+                    <IconButton
+                      icon={Code2}
+                      label={t("inbox.pr.detail_json")}
+                      variant="secondary"
                       onClick={() => onInspect(t("inbox.pr.detail_payload"), prDetailState)}
                       disabled={prDetailState.loading}
-                    >
-                      {t("inbox.pr.detail_json")}
-                    </button>
+                    />
                   </div>
                   {selectedPermission ? (
                     <p className="info-text">
@@ -1838,7 +2002,9 @@ export function InboxPage({
 
                 <section className="inbox-group">
                   <h3>{t("inbox.pr.detail_title")}</h3>
-                  {prDetailState.loading ? <p className="info-text">{t("inbox.pr.loading")}</p> : null}
+                  {prDetailState.loading ? (
+                    <LoadingIndicator size="sm" label={t("inbox.pr.loading")} />
+                  ) : null}
                   {prDetailState.error ? <p className="error-text">{prDetailState.error}</p> : null}
                   {prDetailState.warning ? <p className="warn-text">{prDetailState.warning}</p> : null}
                   {prDetailState.detail ? (
@@ -1904,6 +2070,20 @@ export function InboxPage({
 
                 <section className="inbox-group">
                   <h3>{t("inbox.pr.diff_viewer")}</h3>
+                  <div className="row gap-sm wrap">
+                    <IconButton
+                      icon={AlignJustify}
+                      label={t("inbox.pr.diff_mode.inline")}
+                      variant={diffViewMode === "inline" ? "primary" : "secondary"}
+                      onClick={() => setDiffViewMode("inline")}
+                    />
+                    <IconButton
+                      icon={SplitSquareHorizontal}
+                      label={t("inbox.pr.diff_mode.split")}
+                      variant={diffViewMode === "split" ? "primary" : "secondary"}
+                      onClick={() => setDiffViewMode("split")}
+                    />
+                  </div>
                   <div className="diff-layout">
                     <div className="diff-files">
                       {prDetailState.diffFiles.map((file) => (
@@ -1920,7 +2100,14 @@ export function InboxPage({
                         </button>
                       ))}
                     </div>
-                    <pre className="diff-preview">{diffPreviewText || t("inbox.pr.no_diff")}</pre>
+                    <Suspense fallback={<LoadingIndicator size="sm" label={t("inbox.loading")} />}>
+                      <LazyDiffSyntaxPreview
+                        content={diffPreviewText}
+                        filename={selectedDiffFile?.filename ?? selectedDiffPath}
+                        emptyLabel={t("inbox.pr.no_diff")}
+                        viewMode={diffViewMode}
+                      />
+                    </Suspense>
                   </div>
                 </section>
 
@@ -1966,6 +2153,7 @@ export function InboxPage({
           tokenMismatchMessage={t("inbox.modal.validation.token_mismatch")}
           danger={modalConfig.danger}
           running={modalRunning}
+          runningLabel={t("common.loading")}
           errorMessage={modalError}
           onCancel={closeModal}
           onConfirm={handleModalConfirm}
@@ -2428,11 +2616,32 @@ function buildModalConfig(
         .slice(0, BATCH_PREVIEW_LIMIT)
         .map((item) => `${item.kind.toUpperCase()} ${item.owner}/${item.repo}#${item.number}`);
       const token = `BATCH:CLOSE:${modalState.targets.length}`;
+      const hasIssueTargets = modalState.targets.some((item) => item.kind === "issue");
       return {
         title: t("inbox.modal.batch_close.title"),
         description: fmt("inbox.modal.batch_close.description", {
           count: modalState.targets.length,
         }),
+        fields: hasIssueTargets
+          ? [
+              {
+                name: "issue_reason",
+                label: t("inbox.modal.batch_close.issue_reason"),
+                type: "select",
+                options: [
+                  {
+                    label: t("inbox.modal.batch_close.issue_reason.completed"),
+                    value: "completed",
+                  },
+                  {
+                    label: t("inbox.modal.batch_close.issue_reason.not_planned"),
+                    value: "not planned",
+                  },
+                ],
+                initialValue: "completed",
+              },
+            ]
+          : undefined,
         previewItems,
         confirmLabel: t("inbox.modal.batch_close.confirm"),
         danger: true,
@@ -2517,4 +2726,14 @@ async function mapWithConcurrency<T, R>(
 
   await Promise.all(Array.from({ length: workers }, () => run()));
   return results;
+}
+
+function waitForNextFrame(): Promise<void> {
+  return new Promise((resolve) => {
+    if (typeof window === "undefined" || typeof window.requestAnimationFrame !== "function") {
+      setTimeout(resolve, 0);
+      return;
+    }
+    window.requestAnimationFrame(() => resolve());
+  });
 }

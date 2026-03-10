@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { LoadingIndicator } from "./LoadingIndicator";
 
 interface ModalOption {
   label: string;
@@ -32,6 +33,7 @@ interface InboxActionModalProps {
   tokenMismatchMessage: string;
   danger?: boolean;
   running?: boolean;
+  runningLabel?: string;
   errorMessage?: string | null;
   onCancel: () => void;
   onConfirm: (values: Record<string, string>) => Promise<void> | void;
@@ -56,6 +58,7 @@ export function InboxActionModal({
   tokenMismatchMessage,
   danger = false,
   running = false,
+  runningLabel,
   errorMessage = null,
   onCancel,
   onConfirm,
@@ -204,6 +207,7 @@ export function InboxActionModal({
 
         {validationError ? <p className="error-text">{validationError}</p> : null}
         {errorMessage ? <p className="error-text">{errorMessage}</p> : null}
+        {running ? <LoadingIndicator size="sm" label={runningLabel} /> : null}
 
         <div className="row gap-sm">
           <button type="button" className="btn secondary" onClick={onCancel} disabled={running}>

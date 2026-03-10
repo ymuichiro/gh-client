@@ -35,7 +35,8 @@ test("mock read flow for issues, pull requests and settings", async ({ page }) =
   await page.getByRole("button", { name: "キャンセル" }).click();
   await page.getByRole("button", { name: /一覧に戻る|Back to list/ }).click();
 
-  await page.getByRole("button", { name: "表示中 open を一括 close" }).click();
+  await mockUserIssue.locator('input[type="checkbox"]').check();
+  await page.getByRole("button", { name: /選択項目を close|Close selected/ }).click();
   await expect(page.getByRole("heading", { name: "一括 close 実行" })).toBeVisible();
 
   await page.getByRole("button", { name: "一括 close 実行" }).click();

@@ -14,9 +14,12 @@
     "e2e:write": "GH_CLIENT_LIVE_TEST=1 GH_CLIENT_LIVE_WRITE_TEST=1 playwright test --config playwright.live.config.ts"
   },
   "dependencies": {
-    "@tauri-apps/api": "^2.8.0",
     "@tanstack/react-query": "^5.62.7",
+    "@tauri-apps/api": "^2.8.0",
+    "@tauri-apps/plugin-opener": "^2.5.3",
     "clsx": "^2.1.1",
+    "highlight.js": "^11.11.1",
+    "lucide-react": "^0.544.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.28.1",

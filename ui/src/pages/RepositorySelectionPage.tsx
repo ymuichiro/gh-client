@@ -1,9 +1,12 @@
 import { useCallback, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { Check, RefreshCw } from "lucide-react";
 
 import { executeCommand } from "../core/executor";
 import { useI18n } from "../core/i18n";
 import { normalizeViewerPermission } from "../core/permissions";
+import { IconButton } from "../components/IconButton";
+import { LoadingIndicator } from "../components/LoadingIndicator";
 import {
   type RepositoryScopeConfig,
   type ScopedRepositoryTarget,
@@ -147,6 +150,11 @@ export function RepositorySelectionPage({
   }, [repositoriesByOwner, searchQuery, selectedOrgs]);
 
   const selectedRepositoryCount = selectedRepoKeys.length;
+  const pageLoadingLabel = repoLoading
+    ? t("repo_selection.repo.loading")
+    : orgLoading
+      ? t("repo_selection.org.loading")
+      : null;
 
   const confirmSelection = useCallback(() => {
     if (selectedOrgs.length === 0) {
@@ -182,7 +190,8 @@ export function RepositorySelectionPage({
   }, [navigate, onApplyConfig, repositoriesByOwner, selectedOrgs, selectedRepoKeys, t]);
 
   return (
-    <section className="page-section">
+    <section className="page-section loading-host">
+      {pageLoadingLabel ? <LoadingIndicator overlay label={pageLoadingLabel} /> : null}
       <header className="section-header">
         <h2>{t("repo_selection.title")}</h2>
         <p>{t("repo_selection.subtitle")}</p>
@@ -195,24 +204,22 @@ export function RepositorySelectionPage({
         </div>
 
         <div className="row gap-sm wrap">
-          <button
-            type="button"
-            className="btn secondary"
+          <IconButton
+            icon={RefreshCw}
+            label={orgLoading ? t("repo_selection.org.loading") : t("repo_selection.org.reload")}
+            variant="secondary"
             onClick={() => void loadOrganizations()}
             disabled={orgLoading}
-          >
-            {orgLoading ? t("repo_selection.org.loading") : t("repo_selection.org.reload")}
-          </button>
-          <button
-            type="button"
-            className="btn"
+          />
+          <IconButton
+            icon={RefreshCw}
+            label={repoLoading ? t("repo_selection.repo.loading") : t("repo_selection.repo.update")}
+            variant="primary"
             onClick={() => {
               void updateRepositoryCandidates();
             }}
             disabled={repoLoading || selectedOrgs.length === 0}
-          >
-            {repoLoading ? t("repo_selection.repo.loading") : t("repo_selection.repo.update")}
-          </button>
+          />
         </div>
 
         {orgError ? <p className="error-text">{orgError}</p> : null}
@@ -268,6 +275,7 @@ export function RepositorySelectionPage({
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
             placeholder={t("repo_selection.repo.search_placeholder")}
+            disabled={repoLoading}
           />
         </label>
 
@@ -324,9 +332,13 @@ export function RepositorySelectionPage({
         </div>
 
         <div className="row gap-sm wrap">
-          <button type="button" className="btn" onClick={confirmSelection}>
-            {fmt("repo_selection.confirm", { count: selectedRepositoryCount })}
-          </button>
+          <IconButton
+            icon={Check}
+            label={fmt("repo_selection.confirm", { count: selectedRepositoryCount })}
+            variant="primary"
+            onClick={confirmSelection}
+            disabled={orgLoading || repoLoading}
+          />
         </div>
       </section>
     </section>

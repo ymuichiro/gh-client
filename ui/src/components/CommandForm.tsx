@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { ConfirmModal } from "./ConfirmModal";
+import { LoadingIndicator } from "./LoadingIndicator";
 import { executeCommand, ExecutionError } from "../core/executor";
 import { resolveEnvelopePermission } from "../core/permissions";
 import { useI18n } from "../core/i18n";
@@ -174,7 +175,9 @@ export function CommandForm({
       )}
 
       {!canExecute ? <p className="warn-text">{t("status.permission_missing")}</p> : null}
-      {running ? <p className="info-text">{t("common.loading")} {t("status.cancel_unavailable")}</p> : null}
+      {running ? (
+        <LoadingIndicator size="sm" label={`${t("common.loading")} ${t("status.cancel_unavailable")}`} />
+      ) : null}
       {errorMessage ? <p className="error-text">{errorMessage}</p> : null}
 
       <div className="row gap-sm">
