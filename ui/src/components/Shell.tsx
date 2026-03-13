@@ -1,10 +1,12 @@
-import { useEffect, useState } from "react";
-import { NavLink } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import type { PropsWithChildren } from "react";
 
 import { useI18n } from "../core/i18n";
 
-interface ShellProps extends PropsWithChildren {}
+interface ShellProps extends PropsWithChildren {
+  onNavigateStart?: (to: string) => void;
+}
 type ThemeMode = "light" | "dark";
 const THEME_STORAGE_KEY = "gh-client-theme-mode";
 
@@ -16,15 +18,27 @@ const navItems = [
 
 export function Shell({
   children,
+  onNavigateStart,
 }: ShellProps): JSX.Element {
   const { t } = useI18n();
+  const location = useLocation();
+  const navigate = useNavigate();
   const [theme, setTheme] = useState<ThemeMode>(() => resolveInitialTheme());
+  const pendingNavigationFrame = useRef<number | null>(null);
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
     const storage = getSafeLocalStorage();
     storage?.setItem(THEME_STORAGE_KEY, theme);
   }, [theme]);
+
+  useEffect(() => {
+    return () => {
+      if (pendingNavigationFrame.current !== null) {
+        window.cancelAnimationFrame(pendingNavigationFrame.current);
+      }
+    };
+  }, []);
 
   return (
     <div className="shell">
@@ -36,7 +50,34 @@ export function Shell({
 
         <nav className="nav">
           {navItems.map((item) => (
-            <NavLink key={item.to} to={item.to} className={({ isActive }) => (isActive ? "nav-item active" : "nav-item")}>
+            <NavLink
+              key={item.to}
+              to={item.to}
+              className={({ isActive }) => (isActive ? "nav-item active" : "nav-item")}
+              onClick={(event) => {
+                if (
+                  event.defaultPrevented ||
+                  event.button !== 0 ||
+                  event.metaKey ||
+                  event.ctrlKey ||
+                  event.altKey ||
+                  event.shiftKey ||
+                  item.to === location.pathname
+                ) {
+                  return;
+                }
+
+                event.preventDefault();
+                onNavigateStart?.(item.to);
+                if (pendingNavigationFrame.current !== null) {
+                  window.cancelAnimationFrame(pendingNavigationFrame.current);
+                }
+                pendingNavigationFrame.current = window.requestAnimationFrame(() => {
+                  navigate(item.to);
+                  pendingNavigationFrame.current = null;
+                });
+              }}
+            >
               {t(item.key)}
             </NavLink>
           ))}

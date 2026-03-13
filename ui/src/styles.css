@@ -276,6 +276,58 @@ button,
   max-width: none;
 }
 
+.route-transition {
+  min-height: 100%;
+  transform-origin: top center;
+  transition: opacity 0.26s cubic-bezier(0.16, 0.84, 0.24, 1),
+    transform 0.26s cubic-bezier(0.16, 0.84, 0.24, 1),
+    filter 0.26s cubic-bezier(0.16, 0.84, 0.24, 1);
+  will-change: opacity, transform, filter;
+}
+
+.route-transition.route-transition-pre {
+  opacity: 0.82;
+  transform: translateY(8px) scale(0.996);
+  filter: saturate(0.95);
+}
+
+.route-transition.route-transition-active {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  filter: blur(0);
+}
+
+.route-progress {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  height: 2px;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.route-progress.active {
+  opacity: 1;
+}
+
+.route-progress::before {
+  content: "";
+  display: block;
+  width: 28%;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--accent);
+  transform: translateX(-130%);
+  animation: route-progress 0.62s cubic-bezier(0.16, 0.84, 0.24, 1) both;
+}
+
+@keyframes route-progress {
+  to {
+    transform: translateX(420%);
+  }
+}
+
 .page-section {
   display: grid;
   gap: 14px;
@@ -315,6 +367,30 @@ button,
   border-radius: var(--radius-md);
   background: var(--bg-surface);
   box-shadow: var(--shadow-sm);
+}
+
+.inbox-refresh-rail {
+  height: 2px;
+  width: 100%;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--line);
+}
+
+.inbox-refresh-rail-track {
+  display: block;
+  width: 34%;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+  transform: translateX(-130%);
+  animation: inbox-refresh-progress 0.95s ease-in-out infinite;
+}
+
+@keyframes inbox-refresh-progress {
+  to {
+    transform: translateX(430%);
+  }
 }
 
 .loading-spinner {
@@ -485,6 +561,10 @@ label {
 
 .icon-btn svg {
   flex-shrink: 0;
+}
+
+.icon-btn.icon-btn-loading svg {
+  animation: spinner-rotate 0.8s linear infinite;
 }
 
 .btn:hover {
@@ -1242,5 +1322,30 @@ label {
 
   .theme-switch {
     width: 100%;
+  }
+
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .route-transition {
+    transition-duration: 0.14s;
+  }
+
+  .route-transition.route-transition-pre {
+    opacity: 0.75;
+    transform: none;
+    filter: none;
+  }
+
+  .route-progress::before {
+    animation-duration: 0.24s;
+  }
+
+  .inbox-refresh-rail-track {
+    animation-duration: 1.6s;
+  }
+
+  .loading-spinner {
+    animation-duration: 1.5s;
   }
 }

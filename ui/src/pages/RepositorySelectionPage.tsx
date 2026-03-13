@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Check, RefreshCw } from "lucide-react";
 
@@ -21,12 +21,28 @@ interface RepositorySelectionPageProps {
   onApplyConfig: (config: RepositoryScopeConfig) => void;
 }
 
+interface RepoFetchProgress {
+  processed: number;
+  total: number;
+}
+
+interface OwnerRepoCacheEntry {
+  updatedAt: number;
+  repositories: ScopedRepositoryTarget[];
+}
+
+const OWNER_REPO_CACHE_TTL_MS = 5 * 60 * 1000;
+const MAX_CONCURRENT_OWNER_FETCH = 4;
+
 export function RepositorySelectionPage({
   initialConfig,
   onApplyConfig,
 }: RepositorySelectionPageProps): JSX.Element {
   const { t } = useI18n();
   const navigate = useNavigate();
+  const repoCacheByOwnerRef = useRef<Record<string, OwnerRepoCacheEntry>>(
+    buildInitialOwnerCache(initialConfig?.repositories ?? []),
+  );
 
   const [orgCandidates, setOrgCandidates] = useState<string[]>(() =>
     dedupeStrings(initialConfig?.orgs ?? []),
@@ -44,6 +60,7 @@ export function RepositorySelectionPage({
     ) ?? [],
   );
   const [repoLoading, setRepoLoading] = useState(false);
+  const [repoFetchProgress, setRepoFetchProgress] = useState<RepoFetchProgress | null>(null);
   const [repoError, setRepoError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -55,6 +72,7 @@ export function RepositorySelectionPage({
   const loadOrganizations = useCallback(async () => {
     setOrgLoading(true);
     setOrgError(null);
+    await waitForNextFrame();
 
     try {
       const auth = await executeCommand<{
@@ -100,12 +118,44 @@ export function RepositorySelectionPage({
       return;
     }
 
-    setRepoLoading(true);
     setRepoError(null);
+    const now = Date.now();
+    const cachedByOwner: Record<string, ScopedRepositoryTarget[]> = {};
+    const ownersToFetch: string[] = [];
+
+    for (const owner of selectedOrgs) {
+      const cached = repoCacheByOwnerRef.current[owner];
+      if (cached && now - cached.updatedAt < OWNER_REPO_CACHE_TTL_MS) {
+        cachedByOwner[owner] = cached.repositories;
+      } else {
+        ownersToFetch.push(owner);
+      }
+    }
+
+    if (ownersToFetch.length === 0) {
+      const nextByOwner = Object.fromEntries(
+        selectedOrgs.map((owner) => [owner, cachedByOwner[owner] ?? []]),
+      );
+      const availableKeys = new Set(
+        Object.values(nextByOwner)
+          .flat()
+          .map((repository) => toRepositoryKey(repository.owner, repository.repo)),
+      );
+
+      setRepositoriesByOwner(nextByOwner);
+      setSelectedRepoKeys((current) => current.filter((key) => availableKeys.has(key)));
+      return;
+    }
+
+    setRepoLoading(true);
+    setRepoFetchProgress({ processed: 0, total: ownersToFetch.length });
+    await waitForNextFrame();
 
     try {
-      const listed = await Promise.all(
-        selectedOrgs.map(async (owner) => {
+      const listed = await mapWithConcurrency(
+        ownersToFetch,
+        MAX_CONCURRENT_OWNER_FETCH,
+        async (owner) => {
           const response = await executeCommand<unknown[]>(
             "repo.list",
             { owner, limit: 100 },
@@ -113,10 +163,30 @@ export function RepositorySelectionPage({
           );
 
           return [owner, parseRepositories(owner, response.data)] as const;
-        }),
+        },
+        (processed, total) => {
+          setRepoFetchProgress({ processed, total });
+        },
       );
 
-      const nextByOwner = Object.fromEntries(listed);
+      const fetchedByOwner = Object.fromEntries(listed);
+      const refreshedAt = Date.now();
+      for (const [owner, repositories] of listed) {
+        repoCacheByOwnerRef.current[owner] = {
+          updatedAt: refreshedAt,
+          repositories,
+        };
+      }
+
+      const nextByOwner = Object.fromEntries(
+        selectedOrgs.map((owner) => [
+          owner,
+          fetchedByOwner[owner] ??
+            cachedByOwner[owner] ??
+            repoCacheByOwnerRef.current[owner]?.repositories ??
+            [],
+        ]),
+      );
       const availableKeys = new Set(
         Object.values(nextByOwner)
           .flat()
@@ -129,6 +199,7 @@ export function RepositorySelectionPage({
       setRepoError(cause instanceof Error ? cause.message : String(cause));
     } finally {
       setRepoLoading(false);
+      setRepoFetchProgress(null);
     }
   }, [selectedOrgs, t]);
 
@@ -151,7 +222,12 @@ export function RepositorySelectionPage({
 
   const selectedRepositoryCount = selectedRepoKeys.length;
   const pageLoadingLabel = repoLoading
-    ? t("repo_selection.repo.loading")
+    ? repoFetchProgress
+      ? fmt("repo_selection.repo.progress", {
+          processed: repoFetchProgress.processed,
+          total: repoFetchProgress.total,
+        })
+      : t("repo_selection.repo.loading")
     : orgLoading
       ? t("repo_selection.org.loading")
       : null;
@@ -280,6 +356,14 @@ export function RepositorySelectionPage({
         </label>
 
         {repoError ? <p className="error-text">{repoError}</p> : null}
+        {repoLoading && repoFetchProgress ? (
+          <p className="info-text">
+            {fmt("repo_selection.repo.progress", {
+              processed: repoFetchProgress.processed,
+              total: repoFetchProgress.total,
+            })}
+          </p>
+        ) : null}
 
         <div className="scope-groups">
           {selectedOrgs.map((owner) => {
@@ -373,6 +457,7 @@ function parseRepositories(owner: string, rows: unknown[]): ScopedRepositoryTarg
 }
 
 function dedupeStrings(values: string[]): string[] {
+  const seen = new Set<string>();
   const next: string[] = [];
   for (const value of values) {
     const trimmed = value.trim();
@@ -380,12 +465,63 @@ function dedupeStrings(values: string[]): string[] {
       continue;
     }
 
-    if (!next.includes(trimmed)) {
-      next.push(trimmed);
+    if (seen.has(trimmed)) {
+      continue;
     }
+
+    seen.add(trimmed);
+    next.push(trimmed);
   }
 
   return next;
+}
+
+function buildInitialOwnerCache(
+  repositories: ScopedRepositoryTarget[],
+): Record<string, OwnerRepoCacheEntry> {
+  const grouped = groupRepositoriesByOwner(repositories);
+  const now = Date.now();
+  const cache: Record<string, OwnerRepoCacheEntry> = {};
+  for (const [owner, ownerRepos] of Object.entries(grouped)) {
+    cache[owner] = {
+      updatedAt: now,
+      repositories: ownerRepos,
+    };
+  }
+  return cache;
+}
+
+async function mapWithConcurrency<T, R>(
+  values: T[],
+  concurrency: number,
+  mapper: (value: T) => Promise<R>,
+  onProgress?: (processed: number, total: number) => void,
+): Promise<R[]> {
+  if (values.length === 0) {
+    return [];
+  }
+
+  const workers = Math.max(1, Math.min(concurrency, values.length));
+  const results: R[] = new Array(values.length);
+  let cursor = 0;
+  let processed = 0;
+
+  const run = async () => {
+    while (true) {
+      const index = cursor;
+      cursor += 1;
+      if (index >= values.length) {
+        return;
+      }
+
+      results[index] = await mapper(values[index]);
+      processed += 1;
+      onProgress?.(processed, values.length);
+    }
+  };
+
+  await Promise.all(Array.from({ length: workers }, () => run()));
+  return results;
 }
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -408,4 +544,15 @@ function formatTemplate(template: string, vars: Record<string, string | number>)
   return Object.entries(vars).reduce((output, [key, value]) => {
     return output.replaceAll(`{${key}}`, String(value));
   }, template);
+}
+
+function waitForNextFrame(): Promise<void> {
+  return new Promise((resolve) => {
+    if (typeof window === "undefined" || typeof window.requestAnimationFrame !== "function") {
+      setTimeout(resolve, 0);
+      return;
+    }
+
+    window.requestAnimationFrame(() => resolve());
+  });
 }

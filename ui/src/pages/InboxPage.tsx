@@ -178,6 +178,11 @@ interface BatchProgress {
   processed: number;
 }
 
+interface FetchProgress {
+  total: number;
+  processed: number;
+}
+
 interface InboxActionRequest {
   commandId: CommandId;
   payload: Record<string, unknown>;
@@ -204,6 +209,7 @@ interface InboxPageProps {
   repoTargets: RepoTarget[];
   onExecuted: (event: CommandExecutionEvent) => void;
   onInspect: (title: string, value: unknown) => void;
+  navigationLoadingToken?: number;
   mode: ItemKind;
   title: string;
   subtitle: string;
@@ -230,6 +236,7 @@ export function InboxPage({
   repoTargets,
   onExecuted,
   onInspect,
+  navigationLoadingToken,
   mode,
   title,
   subtitle,
@@ -246,6 +253,11 @@ export function InboxPage({
   const [selectedViewId, setSelectedViewId] = useState<string>("");
   const [items, setItems] = useState<InboxItem[]>([]);
   const [loading, setLoading] = useState(false);
+  const [fetchProgress, setFetchProgress] = useState<FetchProgress | null>(null);
+  const [refreshElapsedSeconds, setRefreshElapsedSeconds] = useState(0);
+  const [immediateLoadingReason, setImmediateLoadingReason] = useState<"navigation" | "refresh" | null>(
+    () => (navigationLoadingToken ? "navigation" : null),
+  );
   const [error, setError] = useState<string | null>(null);
   const [fetchWarnings, setFetchWarnings] = useState<string[]>([]);
   const [lastLoadedAt, setLastLoadedAt] = useState<number | null>(null);
@@ -268,6 +280,9 @@ export function InboxPage({
   const inboxFetchSeq = useRef(0);
   const prDetailFetchSeq = useRef(0);
   const issueDetailFetchSeq = useRef(0);
+  const immediateLoadingHideTimer = useRef<number | null>(null);
+  const immediateLoadingVisibleUntil = useRef(0);
+  const lastNavigationLoadingToken = useRef(navigationLoadingToken ?? 0);
 
   const defaultViews = useMemo(() => buildDefaultViews(t, mode), [t, mode]);
   const allViews = useMemo(() => [...defaultViews, ...customViews], [customViews, defaultViews]);
@@ -289,6 +304,108 @@ export function InboxPage({
     (key: string, vars: Record<string, string | number>) => formatTemplate(t(key), vars),
     [t],
   );
+
+  const refreshStatusLabel = useMemo(() => {
+    if (loading) {
+      const progressLabel = fetchProgress
+        ? fmt("inbox.loading_progress", {
+            processed: fetchProgress.processed,
+            total: fetchProgress.total,
+          })
+        : t("inbox.loading");
+
+      const elapsedLabel = fmt("inbox.loading_elapsed", { seconds: refreshElapsedSeconds });
+      return `${progressLabel} - ${elapsedLabel}`;
+    }
+
+    if (lastLoadedAt) {
+      return fmt("inbox.last_loaded", { value: formatTimestamp(lastLoadedAt) });
+    }
+
+    return null;
+  }, [fetchProgress, fmt, lastLoadedAt, loading, refreshElapsedSeconds, t]);
+
+  const queueLoadingLabel = useMemo(() => {
+    if (!loading) {
+      if (immediateLoadingReason === "refresh") {
+        return t("inbox.refreshing");
+      }
+
+      if (immediateLoadingReason === "navigation") {
+        return t("inbox.loading");
+      }
+
+      return null;
+    }
+    return refreshStatusLabel ?? t("inbox.loading");
+  }, [immediateLoadingReason, loading, refreshStatusLabel, t]);
+
+  const showImmediateLoading = useCallback((reason: "navigation" | "refresh") => {
+    if (immediateLoadingHideTimer.current !== null) {
+      window.clearTimeout(immediateLoadingHideTimer.current);
+      immediateLoadingHideTimer.current = null;
+    }
+
+    immediateLoadingVisibleUntil.current = Date.now() + 520;
+    setImmediateLoadingReason(reason);
+  }, []);
+
+  useEffect(() => {
+    if (!loading) {
+      setRefreshElapsedSeconds(0);
+      return;
+    }
+
+    const startedAt = Date.now();
+    setRefreshElapsedSeconds(0);
+    const timer = window.setInterval(() => {
+      setRefreshElapsedSeconds(Math.floor((Date.now() - startedAt) / 1000));
+    }, 1_000);
+
+    return () => {
+      window.clearInterval(timer);
+    };
+  }, [loading]);
+
+  useEffect(() => {
+    return () => {
+      if (immediateLoadingHideTimer.current !== null) {
+        window.clearTimeout(immediateLoadingHideTimer.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!navigationLoadingToken) {
+      return;
+    }
+
+    if (navigationLoadingToken === lastNavigationLoadingToken.current) {
+      return;
+    }
+
+    lastNavigationLoadingToken.current = navigationLoadingToken;
+    showImmediateLoading("navigation");
+  }, [navigationLoadingToken, showImmediateLoading]);
+
+  useEffect(() => {
+    if (!immediateLoadingReason || loading) {
+      return;
+    }
+
+    const waitMs = Math.max(0, immediateLoadingVisibleUntil.current - Date.now());
+    immediateLoadingHideTimer.current = window.setTimeout(() => {
+      setImmediateLoadingReason(null);
+      immediateLoadingHideTimer.current = null;
+    }, waitMs);
+
+    return () => {
+      if (immediateLoadingHideTimer.current !== null) {
+        window.clearTimeout(immediateLoadingHideTimer.current);
+        immediateLoadingHideTimer.current = null;
+      }
+    };
+  }, [immediateLoadingReason, loading]);
 
   useEffect(() => {
     let active = true;
@@ -385,8 +502,8 @@ export function InboxPage({
       const repoKey = toRepoKey(target.owner, target.repo);
 
       if (mode === "pr") {
-        const prSettled = await Promise.allSettled([
-          executeCommand<unknown[]>(
+        try {
+          const response = await executeCommand<unknown[]>(
             "pr.list",
             {
               owner: target.owner,
@@ -395,28 +512,24 @@ export function InboxPage({
               force_refresh: forceRefresh,
             },
             { permission },
-          ),
-        ]);
-        const nextItems: InboxItem[] = [];
-        const errors: string[] = [];
-
-        if (prSettled[0].status === "fulfilled") {
-          nextItems.push(
-            ...mapPullRequests(target.owner, target.repo, prSettled[0].value.data ?? []),
           );
-        } else {
-          errors.push(formatErrorForRepo("pr.list", prSettled[0].reason));
-        }
 
-        return {
-          key: repoKey,
-          items: nextItems,
-          errors,
-        };
+          return {
+            key: repoKey,
+            items: mapPullRequests(target.owner, target.repo, response.data ?? []),
+            errors: [],
+          };
+        } catch (cause) {
+          return {
+            key: repoKey,
+            items: [],
+            errors: [formatErrorForRepo("pr.list", cause)],
+          };
+        }
       }
 
-      const issueSettled = await Promise.allSettled([
-        executeCommand<unknown[]>(
+      try {
+        const response = await executeCommand<unknown[]>(
           "issue.list",
           {
             owner: target.owner,
@@ -425,23 +538,20 @@ export function InboxPage({
             force_refresh: forceRefresh,
           },
           { permission },
-        ),
-      ]);
+        );
 
-      const nextItems: InboxItem[] = [];
-      const errors: string[] = [];
-
-      if (issueSettled[0].status === "fulfilled") {
-        nextItems.push(...mapIssues(target.owner, target.repo, issueSettled[0].value.data ?? []));
-      } else {
-        errors.push(formatErrorForRepo("issue.list", issueSettled[0].reason));
+        return {
+          key: repoKey,
+          items: mapIssues(target.owner, target.repo, response.data ?? []),
+          errors: [],
+        };
+      } catch (cause) {
+        return {
+          key: repoKey,
+          items: [],
+          errors: [formatErrorForRepo("issue.list", cause)],
+        };
       }
-
-      return {
-        key: repoKey,
-        items: nextItems,
-        errors,
-      };
     },
     [mode],
   );
@@ -496,6 +606,7 @@ export function InboxPage({
     const forceRefresh = options?.force ?? false;
     const requestSeq = ++inboxFetchSeq.current;
     setLoading(true);
+    setFetchProgress(null);
     setError(null);
 
     await waitForNextFrame();
@@ -513,10 +624,17 @@ export function InboxPage({
         return;
       }
 
+      setFetchProgress({ total: selectedTargets.length, processed: 0 });
       const fetchResults = await mapWithConcurrency(
         selectedTargets,
         MAX_CONCURRENT_REPO_FETCH,
         (target) => loadRepoInbox(target, forceRefresh),
+        (processed, total) => {
+          if (requestSeq !== inboxFetchSeq.current) {
+            return;
+          }
+          setFetchProgress({ processed, total });
+        },
       );
 
       if (requestSeq !== inboxFetchSeq.current) {
@@ -543,9 +661,22 @@ export function InboxPage({
     } finally {
       if (requestSeq === inboxFetchSeq.current) {
         setLoading(false);
+        setFetchProgress(null);
       }
     }
   }, [applyInboxSnapshot, loadRepoInbox, mode, repoTargetsByKey, selectedRepoKeys]);
+
+  const startManualRefresh = useCallback(() => {
+    if (loading) {
+      return;
+    }
+
+    showImmediateLoading("refresh");
+    void (async () => {
+      await waitForNextFrame();
+      await refreshInbox({ force: true });
+    })();
+  }, [loading, refreshInbox, showImmediateLoading]);
 
   useEffect(() => {
     if (selectedRepoKeys.length === 0) {
@@ -1344,12 +1475,12 @@ export function InboxPage({
             icon={RefreshCw}
             label={loading ? t("inbox.refreshing") : t("inbox.refresh")}
             variant="secondary"
-            onClick={() => {
-              void refreshInbox({ force: true });
-            }}
+            className={loading ? "icon-btn-loading" : undefined}
+            onClick={startManualRefresh}
             disabled={loading}
           />
         </div>
+        {refreshStatusLabel ? <p className="info-text">{refreshStatusLabel}</p> : null}
 
         <section className="inbox-group">
           <h3>{t("inbox.section.repositories")}</h3>
@@ -1581,13 +1712,23 @@ export function InboxPage({
         </section>
       </aside>
 
-      <section className="inbox-panel inbox-center">
+      <section className="inbox-panel inbox-center loading-host">
+        {queueLoadingLabel ? (
+          <LoadingIndicator
+            overlay
+            size={items.length === 0 ? "md" : "sm"}
+            label={queueLoadingLabel}
+          />
+        ) : null}
+        {loading ? (
+          <div className="inbox-refresh-rail" aria-hidden="true">
+            <span className="inbox-refresh-rail-track" />
+          </div>
+        ) : null}
         <header className="section-header">
           <h2>{t("inbox.queue.title")}</h2>
           <p>{fmt("inbox.queue.count", { count: filteredItems.length })}</p>
         </header>
-
-        {loading ? <LoadingIndicator size="sm" label={t("inbox.loading")} /> : null}
 
         <div className="row gap-sm wrap">
           <IconButton
@@ -2697,6 +2838,10 @@ function formatTemplate(
   }, template);
 }
 
+function formatTimestamp(timestamp: number): string {
+  return new Date(timestamp).toLocaleTimeString();
+}
+
 function toFrontendInvokeError(cause: unknown, commandId: CommandId): FrontendInvokeError {
   if (cause instanceof ExecutionError) {
     return cause.detail;
@@ -2728,6 +2873,7 @@ async function mapWithConcurrency<T, R>(
   values: T[],
   concurrency: number,
   mapper: (value: T) => Promise<R>,
+  onProgress?: (processed: number, total: number) => void,
 ): Promise<R[]> {
   if (values.length === 0) {
     return [];
@@ -2736,6 +2882,7 @@ async function mapWithConcurrency<T, R>(
   const workers = Math.max(1, Math.min(concurrency, values.length));
   const results: R[] = new Array(values.length);
   let cursor = 0;
+  let processed = 0;
 
   const run = async () => {
     while (true) {
@@ -2746,6 +2893,8 @@ async function mapWithConcurrency<T, R>(
       }
 
       results[index] = await mapper(values[index]);
+      processed += 1;
+      onProgress?.(processed, values.length);
     }
   };
 
