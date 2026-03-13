@@ -4,98 +4,28 @@ use serde_json::Value;
 use crate::core::command_registry::CommandRegistry;
 use crate::core::error::AppError;
 
-pub const PAYLOAD_CONTRACT_VERSION: &str = "2026-03-09.v4";
+pub const PAYLOAD_CONTRACT_VERSION: &str = "2026-03-13.v5";
 
 pub const STABLE_COMMAND_IDS: &[&str] = &[
-    "discussions.answer",
-    "discussions.categories.list",
-    "discussions.close",
-    "discussions.create",
-    "discussions.list",
     "auth.organizations.list",
     "auth.status",
-    "insights.clones.get",
-    "insights.views.get",
     "issue.close",
     "issue.comment",
-    "issue.create",
     "issue.edit",
     "issue.list",
-    "issue.view",
     "issue.reopen",
-    "pages.create",
-    "pages.delete",
-    "pages.get",
-    "pages.update",
+    "issue.view",
     "pr.close",
-    "pr.comments.create",
     "pr.comments.list",
-    "pr.create",
     "pr.diff.files.list",
     "pr.diff.raw.get",
-    "pr.edit",
     "pr.list",
     "pr.merge",
     "pr.reopen",
     "pr.review",
-    "pr.review_comments.create",
-    "pr.review_comments.list",
-    "pr.review_comments.reply",
     "pr.review_threads.list",
-    "pr.review_threads.resolve",
-    "pr.review_threads.unresolve",
     "pr.view",
-    "projects.items.add",
-    "projects.items.list",
-    "projects.list",
-    "release.asset.delete",
-    "release.asset.upload",
-    "release.create",
-    "release.delete",
-    "release.edit",
-    "release.list",
-    "repo.branch.create",
-    "repo.branch.delete",
-    "repo.branch.ref.get",
-    "repo.branches.list",
-    "repo.commits.list",
-    "repo.create",
-    "repo.delete",
-    "repo.edit",
     "repo.list",
-    "repo.topics.replace",
-    "rulesets.create",
-    "rulesets.delete",
-    "rulesets.get",
-    "rulesets.list",
-    "rulesets.update",
-    "run.cancel",
-    "run.list",
-    "run.logs",
-    "run.rerun",
-    "run.view",
-    "settings.branch_protection.get",
-    "settings.branch_protection.update",
-    "settings.collaborators.add",
-    "settings.collaborators.list",
-    "settings.collaborators.remove",
-    "settings.dependabot_alerts.list",
-    "settings.deploy_keys.add",
-    "settings.deploy_keys.delete",
-    "settings.deploy_keys.list",
-    "settings.secrets.delete",
-    "settings.secrets.list",
-    "settings.secrets.set",
-    "settings.variables.delete",
-    "settings.variables.list",
-    "settings.variables.set",
-    "settings.webhooks.create",
-    "settings.webhooks.delete",
-    "settings.webhooks.list",
-    "settings.webhooks.ping",
-    "wiki.get",
-    "wiki.update",
-    "workflow.list",
 ];
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -167,14 +97,6 @@ impl FrontendCommandEnvelope {
 
 pub fn validate_registry_contract(registry: &CommandRegistry) -> Result<(), AppError> {
     let actual = registry.command_ids();
-
-    if actual.len() != STABLE_COMMAND_IDS.len() {
-        return Err(AppError::validation(format!(
-            "stable contract mismatch: expected {} commands, got {}",
-            STABLE_COMMAND_IDS.len(),
-            actual.len()
-        )));
-    }
 
     for expected in STABLE_COMMAND_IDS {
         if !actual.contains(expected) {
