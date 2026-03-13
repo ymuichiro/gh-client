@@ -139,6 +139,8 @@ interface PullRequestDetailState {
   threads: PullRequestReviewThread[];
   diffFiles: PullRequestDiffFile[];
   rawDiffText: string;
+  rawDiffLoading: boolean;
+  rawDiffRequested: boolean;
 }
 
 interface IssueCommentEntry {
@@ -224,6 +226,8 @@ const initialPrDetailState: PullRequestDetailState = {
   threads: [],
   diffFiles: [],
   rawDiffText: "",
+  rawDiffLoading: false,
+  rawDiffRequested: false,
 };
 
 const initialIssueDetailState: IssueDetailState = {
@@ -280,6 +284,7 @@ export function InboxPage({
   const inboxFetchSeq = useRef(0);
   const prDetailFetchSeq = useRef(0);
   const issueDetailFetchSeq = useRef(0);
+  const rawDiffFetchSeq = useRef(0);
   const immediateLoadingHideTimer = useRef<number | null>(null);
   const immediateLoadingVisibleUntil = useRef(0);
   const lastNavigationLoadingToken = useRef(navigationLoadingToken ?? 0);
@@ -774,6 +779,8 @@ export function InboxPage({
 
     setPrDetailState({ ...initialPrDetailState, loading: true });
 
+    rawDiffFetchSeq.current += 1;
+
     void Promise.allSettled([
       executeCommand<PullRequestDetail>(
         "pr.view",
@@ -795,17 +802,12 @@ export function InboxPage({
         { owner: target.owner, repo: target.repo, number: target.number },
         { permission },
       ),
-      executeCommand<PullRequestRawDiff>(
-        "pr.diff.raw.get",
-        { owner: target.owner, repo: target.repo, number: target.number },
-        { permission },
-      ),
     ]).then((settled) => {
       if (requestSeq !== prDetailFetchSeq.current) {
         return;
       }
 
-      const [detailSettled, commentsSettled, threadsSettled, filesSettled, rawDiffSettled] = settled;
+      const [detailSettled, commentsSettled, threadsSettled, filesSettled] = settled;
 
       const detail =
         detailSettled.status === "fulfilled" ? detailSettled.value.data : null;
@@ -814,8 +816,6 @@ export function InboxPage({
       const threads =
         threadsSettled.status === "fulfilled" ? threadsSettled.value.data ?? [] : [];
       const diffFiles = filesSettled.status === "fulfilled" ? filesSettled.value.data ?? [] : [];
-      const rawDiffText =
-        rawDiffSettled.status === "fulfilled" ? rawDiffSettled.value.data?.text ?? "" : "";
 
       const failureCount = settled.filter((entry) => entry.status === "rejected").length;
 
@@ -830,7 +830,9 @@ export function InboxPage({
         comments,
         threads,
         diffFiles,
-        rawDiffText,
+        rawDiffText: "",
+        rawDiffLoading: false,
+        rawDiffRequested: false,
       });
 
       setSelectedDiffPath((current) => {
@@ -842,6 +844,82 @@ export function InboxPage({
       });
     });
   }, [detailOpen, fmt, repoTargetsByKey, selectedItem, t]);
+
+  const selectedDiffFile = useMemo(
+    () => prDetailState.diffFiles.find((file) => file.filename === selectedDiffPath) ?? null,
+    [prDetailState.diffFiles, selectedDiffPath],
+  );
+
+  useEffect(() => {
+    const target = selectedItem;
+    if (!detailOpen || !target || target.kind !== "pr") {
+      rawDiffFetchSeq.current += 1;
+      return;
+    }
+
+    if (!selectedDiffFile) {
+      return;
+    }
+
+    if (selectedDiffFile?.patch?.trim().length) {
+      return;
+    }
+
+    if (
+      prDetailState.rawDiffText.trim().length > 0 ||
+      prDetailState.rawDiffLoading ||
+      prDetailState.rawDiffRequested
+    ) {
+      return;
+    }
+
+    const permission =
+      repoTargetsByKey.get(toRepoKey(target.owner, target.repo))?.viewerPermission ?? "viewer";
+    const requestSeq = ++rawDiffFetchSeq.current;
+
+    setPrDetailState((current) => ({
+      ...current,
+      rawDiffLoading: true,
+      rawDiffRequested: true,
+    }));
+
+    void executeCommand<PullRequestRawDiff>(
+      "pr.diff.raw.get",
+      { owner: target.owner, repo: target.repo, number: target.number },
+      { permission },
+    )
+      .then((result) => {
+        if (requestSeq !== rawDiffFetchSeq.current) {
+          return;
+        }
+
+        setPrDetailState((current) => ({
+          ...current,
+          rawDiffText: result.data?.text ?? "",
+          rawDiffLoading: false,
+          rawDiffRequested: true,
+        }));
+      })
+      .catch(() => {
+        if (requestSeq !== rawDiffFetchSeq.current) {
+          return;
+        }
+
+        setPrDetailState((current) => ({
+          ...current,
+          rawDiffLoading: false,
+          rawDiffRequested: true,
+        }));
+      });
+  }, [
+    detailOpen,
+    prDetailState.rawDiffLoading,
+    prDetailState.rawDiffRequested,
+    prDetailState.rawDiffText,
+    repoTargetsByKey,
+    selectedDiffFile,
+    selectedItem,
+  ]);
 
   useEffect(() => {
     const target = selectedItem;
@@ -885,11 +963,6 @@ export function InboxPage({
         });
       });
   }, [detailOpen, repoTargetsByKey, selectedItem]);
-
-  const selectedDiffFile = useMemo(
-    () => prDetailState.diffFiles.find((file) => file.filename === selectedDiffPath) ?? null,
-    [prDetailState.diffFiles, selectedDiffPath],
-  );
 
   const unresolvedThreads = useMemo(
     () => prDetailState.threads.filter((thread) => !thread.is_resolved),
@@ -2273,6 +2346,9 @@ export function InboxPage({
                         emptyLabel={t("inbox.pr.no_diff")}
                         viewMode={diffViewMode}
                       />
+                      {prDetailState.rawDiffLoading && !selectedDiffFile?.patch?.trim().length ? (
+                        <LoadingIndicator size="sm" label={t("common.loading")} />
+                      ) : null}
                     </Suspense>
                   </div>
                 </section>
