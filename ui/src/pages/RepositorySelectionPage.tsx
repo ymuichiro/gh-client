@@ -41,7 +41,7 @@ export function RepositorySelectionPage({
   const { t } = useI18n();
   const navigate = useNavigate();
   const repoCacheByOwnerRef = useRef<Record<string, OwnerRepoCacheEntry>>(
-    buildInitialOwnerCache(initialConfig?.repositories ?? []),
+    buildInitialOwnerCache(initialConfig),
   );
 
   const [orgCandidates, setOrgCandidates] = useState<string[]>(() =>
@@ -477,14 +477,19 @@ function dedupeStrings(values: string[]): string[] {
 }
 
 function buildInitialOwnerCache(
-  repositories: ScopedRepositoryTarget[],
+  config: RepositoryScopeConfig | null,
 ): Record<string, OwnerRepoCacheEntry> {
-  const grouped = groupRepositoriesByOwner(repositories);
-  const now = Date.now();
+  if (!config) {
+    return {};
+  }
+
+  const grouped = groupRepositoriesByOwner(config.repositories);
+  const updatedAt = Date.parse(config.updatedAt);
+  const cacheUpdatedAt = Number.isFinite(updatedAt) ? updatedAt : 0;
   const cache: Record<string, OwnerRepoCacheEntry> = {};
   for (const [owner, ownerRepos] of Object.entries(grouped)) {
     cache[owner] = {
-      updatedAt: now,
+      updatedAt: cacheUpdatedAt,
       repositories: ownerRepos,
     };
   }
