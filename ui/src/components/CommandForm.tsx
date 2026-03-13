@@ -47,9 +47,12 @@ export function CommandForm({
   const [values, setValues] = useState<Record<string, string | boolean>>({});
   const [rawPayload, setRawPayload] = useState("{}");
   const [running, setRunning] = useState(false);
+  const [runningSeconds, setRunningSeconds] = useState(0);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [showConfirm, setShowConfirm] = useState(false);
   const [lastResponse, setLastResponse] = useState<unknown>(null);
+  const usesOwnerField = useMemo(() => hasField(spec.fields, "owner"), [spec.fields]);
+  const usesRepoField = useMemo(() => hasField(spec.fields, "repo"), [spec.fields]);
 
   const effectivePermission = useMemo(
     () => resolveEnvelopePermission(spec.requiredPermission, repoPermission, spec.needsRepoContext),
@@ -57,12 +60,43 @@ export function CommandForm({
   );
 
   useEffect(() => {
-    setValues((prev) => ({
-      ...prev,
-      ...(hasField(spec.fields, "owner") ? { owner } : {}),
-      ...(hasField(spec.fields, "repo") ? { repo } : {}),
-    }));
-  }, [owner, repo, spec.fields]);
+    if (!usesOwnerField && !usesRepoField) {
+      return;
+    }
+
+    setValues((prev) => {
+      let changed = false;
+      const next: Record<string, string | boolean> = { ...prev };
+
+      if (usesOwnerField && prev.owner !== owner) {
+        next.owner = owner;
+        changed = true;
+      }
+
+      if (usesRepoField && prev.repo !== repo) {
+        next.repo = repo;
+        changed = true;
+      }
+
+      return changed ? next : prev;
+    });
+  }, [owner, repo, usesOwnerField, usesRepoField]);
+
+  useEffect(() => {
+    if (!running) {
+      setRunningSeconds(0);
+      return;
+    }
+
+    const startedAt = Date.now();
+    const timer = window.setInterval(() => {
+      setRunningSeconds(Math.floor((Date.now() - startedAt) / 1000));
+    }, 1_000);
+
+    return () => {
+      window.clearInterval(timer);
+    };
+  }, [running]);
 
   const canExecute = Boolean(effectivePermission);
 
@@ -176,7 +210,10 @@ export function CommandForm({
 
       {!canExecute ? <p className="warn-text">{t("status.permission_missing")}</p> : null}
       {running ? (
-        <LoadingIndicator size="sm" label={`${t("common.loading")} ${t("status.cancel_unavailable")}`} />
+        <LoadingIndicator
+          size="sm"
+          label={`${t("common.loading")} ${t("status.cancel_unavailable")} (${runningSeconds}s)`}
+        />
       ) : null}
       {errorMessage ? <p className="error-text">{errorMessage}</p> : null}
 

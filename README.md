@@ -18,10 +18,8 @@
 - [システム設計](docs/architecture.md)
 - [バックエンド設計 (`gh` 実行基盤)](docs/backend.md)
 - [実装計画（マイルストーン）](docs/implementation-plan.md)
-- [ROADMAP](ROADMAP.md)
 - [Frontend Payload Contract](docs/payload-contract.md)
 - [Memory Log](docs/memory/README.md)
-- [TODO](TODO.md)
 - [AGENT 運用ガイド](AGENT.md)
 
 ## 実装状況（資産）

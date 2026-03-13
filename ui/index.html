@@ -4,6 +4,53 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>gh-client</title>
+    <script>
+      (() => {
+        const KEY = "gh-client-theme-mode";
+        let theme = "light";
+        try {
+          const stored = window.localStorage.getItem(KEY);
+          if (stored === "light" || stored === "dark") {
+            theme = stored;
+          } else if (
+            typeof window.matchMedia === "function" &&
+            window.matchMedia("(prefers-color-scheme: dark)").matches
+          ) {
+            theme = "dark";
+          }
+        } catch (_error) {
+          // Ignore storage read errors in restricted contexts.
+        }
+        document.documentElement.dataset.theme = theme;
+      })();
+    </script>
+    <style>
+      :root {
+        color-scheme: light;
+      }
+
+      :root[data-theme="dark"] {
+        color-scheme: dark;
+      }
+
+      html,
+      body {
+        margin: 0;
+        min-height: 100%;
+      }
+
+      body {
+        background: #f1f1f1;
+        color: #121212;
+        font-family: "Manrope", "Avenir Next", "Segoe UI", sans-serif;
+      }
+
+      :root[data-theme="dark"] body {
+        background: #080808;
+        color: #f4f4f4;
+      }
+
+    </style>
   </head>
   <body>
     <div id="root"></div>
