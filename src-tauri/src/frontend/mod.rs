@@ -8,6 +8,7 @@ use crate::core::command_registry::CommandRegistry;
 use crate::core::error::{AppError, ErrorCode};
 use crate::core::executor::{CommandExecutor, Runner};
 use crate::core::observability::TraceContext;
+use crate::core::permission_resolver::RepoPermissionResolver;
 use crate::core::policy_guard::RepoPermission;
 use crate::features::actions::service::{ActionsService, RunActionInput};
 use crate::features::auth::service::AuthService;
@@ -50,92 +51,22 @@ pub const SUPPORTED_COMMAND_IDS: &[&str] = &[
     "auth.organizations.list",
     "auth.status",
     "repo.list",
-    "repo.create",
-    "repo.edit",
-    "repo.topics.replace",
-    "repo.branches.list",
-    "repo.branch.ref.get",
-    "repo.branch.create",
-    "repo.branch.delete",
-    "repo.commits.list",
-    "repo.delete",
     "pr.list",
-    "pr.create",
     "pr.view",
     "pr.review",
-    "pr.edit",
     "pr.close",
     "pr.reopen",
     "pr.merge",
     "pr.comments.list",
-    "pr.comments.create",
-    "pr.review_comments.list",
-    "pr.review_comments.create",
-    "pr.review_comments.reply",
     "pr.review_threads.list",
-    "pr.review_threads.resolve",
-    "pr.review_threads.unresolve",
     "pr.diff.files.list",
     "pr.diff.raw.get",
     "issue.list",
     "issue.view",
-    "issue.create",
     "issue.comment",
     "issue.edit",
     "issue.close",
     "issue.reopen",
-    "workflow.list",
-    "run.list",
-    "run.rerun",
-    "run.view",
-    "run.logs",
-    "run.cancel",
-    "release.list",
-    "release.create",
-    "release.edit",
-    "release.asset.upload",
-    "release.asset.delete",
-    "release.delete",
-    "settings.collaborators.list",
-    "settings.collaborators.add",
-    "settings.collaborators.remove",
-    "settings.secrets.list",
-    "settings.secrets.set",
-    "settings.secrets.delete",
-    "settings.variables.list",
-    "settings.variables.set",
-    "settings.variables.delete",
-    "settings.webhooks.list",
-    "settings.webhooks.create",
-    "settings.webhooks.ping",
-    "settings.webhooks.delete",
-    "settings.branch_protection.get",
-    "settings.branch_protection.update",
-    "settings.deploy_keys.list",
-    "settings.deploy_keys.add",
-    "settings.deploy_keys.delete",
-    "settings.dependabot_alerts.list",
-    "insights.views.get",
-    "insights.clones.get",
-    "projects.list",
-    "projects.items.list",
-    "projects.items.add",
-    "discussions.categories.list",
-    "discussions.list",
-    "discussions.create",
-    "discussions.close",
-    "discussions.answer",
-    "wiki.get",
-    "wiki.update",
-    "pages.get",
-    "pages.create",
-    "pages.update",
-    "pages.delete",
-    "rulesets.list",
-    "rulesets.get",
-    "rulesets.create",
-    "rulesets.update",
-    "rulesets.delete",
 ];
 
 pub struct FrontendDispatcher<R: Runner + Clone> {
@@ -336,6 +267,8 @@ impl<R: Runner + Clone> FrontendDispatcher<R> {
             }
             "pr.review" => {
                 let p: PullRequestReviewPayload = parse_payload(payload)?;
+                let permission =
+                    self.resolve_repo_permission(&p.owner, &p.repo, &request_id)?;
                 let input = ReviewPullRequestInput {
                     owner: p.owner,
                     repo: p.repo,
@@ -363,6 +296,8 @@ impl<R: Runner + Clone> FrontendDispatcher<R> {
             }
             "pr.close" => {
                 let p: PullRequestClosePayload = parse_payload(payload)?;
+                let permission =
+                    self.resolve_repo_permission(&p.owner, &p.repo, &request_id)?;
                 let input = ClosePullRequestInput {
                     owner: p.owner,
                     repo: p.repo,
@@ -376,6 +311,8 @@ impl<R: Runner + Clone> FrontendDispatcher<R> {
             }
             "pr.reopen" => {
                 let p: PullRequestReopenPayload = parse_payload(payload)?;
+                let permission =
+                    self.resolve_repo_permission(&p.owner, &p.repo, &request_id)?;
                 let input = ReopenPullRequestInput {
                     owner: p.owner,
                     repo: p.repo,
@@ -388,6 +325,8 @@ impl<R: Runner + Clone> FrontendDispatcher<R> {
             }
             "pr.merge" => {
                 let p: PullRequestMergePayload = parse_payload(payload)?;
+                let permission =
+                    self.resolve_repo_permission(&p.owner, &p.repo, &request_id)?;
                 let input = MergePullRequestInput {
                     owner: p.owner,
                     repo: p.repo,
@@ -558,6 +497,8 @@ impl<R: Runner + Clone> FrontendDispatcher<R> {
             }
             "issue.comment" => {
                 let p: IssueCommentPayload = parse_payload(payload)?;
+                let permission =
+                    self.resolve_repo_permission(&p.owner, &p.repo, &request_id)?;
                 let input = CommentIssueInput {
                     owner: p.owner,
                     repo: p.repo,
@@ -570,6 +511,8 @@ impl<R: Runner + Clone> FrontendDispatcher<R> {
             }
             "issue.edit" => {
                 let p: IssueEditPayload = parse_payload(payload)?;
+                let permission =
+                    self.resolve_repo_permission(&p.owner, &p.repo, &request_id)?;
                 let input = EditIssueInput {
                     owner: p.owner,
                     repo: p.repo,
@@ -587,6 +530,8 @@ impl<R: Runner + Clone> FrontendDispatcher<R> {
             }
             "issue.close" => {
                 let p: IssueClosePayload = parse_payload(payload)?;
+                let permission =
+                    self.resolve_repo_permission(&p.owner, &p.repo, &request_id)?;
                 let input = CloseIssueInput {
                     owner: p.owner,
                     repo: p.repo,
@@ -600,6 +545,8 @@ impl<R: Runner + Clone> FrontendDispatcher<R> {
             }
             "issue.reopen" => {
                 let p: IssueReopenPayload = parse_payload(payload)?;
+                let permission =
+                    self.resolve_repo_permission(&p.owner, &p.repo, &request_id)?;
                 let input = ReopenIssueInput {
                     owner: p.owner,
                     repo: p.repo,
@@ -1264,6 +1211,20 @@ impl<R: Runner + Clone> FrontendDispatcher<R> {
 
     fn executor(&self) -> CommandExecutor<R> {
         CommandExecutor::new(self.runner.clone(), self.safe_test_mode)
+    }
+
+    fn permission_resolver(&self) -> RepoPermissionResolver<R> {
+        RepoPermissionResolver::new(self.executor())
+    }
+
+    fn resolve_repo_permission(
+        &self,
+        owner: &str,
+        repo: &str,
+        request_id: &str,
+    ) -> Result<RepoPermission, AppError> {
+        self.permission_resolver()
+            .resolve(owner, repo, &trace(request_id))
     }
 
     fn auth_service(&self) -> AuthService<R> {
@@ -1984,6 +1945,10 @@ mod tests {
             self.calls.lock().expect("lock poisoned").len()
         }
 
+        fn call_at(&self, index: usize) -> Option<(String, Vec<String>)> {
+            self.calls.lock().expect("lock poisoned").get(index).cloned()
+        }
+
         fn last_call(&self) -> Option<(String, Vec<String>)> {
             self.calls.lock().expect("lock poisoned").last().cloned()
         }
@@ -2127,20 +2092,41 @@ mod tests {
     }
 
     #[test]
-    fn defaults_permission_to_viewer_and_denies_admin_action() {
-        let (runner, state) = RecordingRunner::new(vec![]);
+    fn resolves_repo_permission_server_side_for_mutations() {
+        let (runner, state) = RecordingRunner::new(vec![
+            RawExecutionOutput {
+                exit_code: 0,
+                stdout: r#"{"admin":false,"maintain":false,"push":true,"triage":false,"pull":true}"#
+                    .into(),
+                stderr: String::new(),
+            },
+            RawExecutionOutput {
+                exit_code: 0,
+                stdout: String::new(),
+                stderr: String::new(),
+            },
+        ]);
         let dispatcher =
             FrontendDispatcher::new(runner, false).expect("dispatcher should initialize");
 
-        let err = dispatcher
-            .execute_envelope(envelope(
-                "settings.collaborators.list",
-                json!({"owner":"octocat","repo":"hello"}),
-            ))
-            .expect_err("viewer should be denied");
+        let mut env = envelope(
+            "pr.review",
+            json!({"owner":"octocat","repo":"hello","number":1,"event":"approve"}),
+        );
+        env.permission = Some(crate::contract::ContractRepoPermission::Viewer);
 
-        assert_eq!(err.code, ErrorCode::PermissionDenied);
-        assert_eq!(state.call_count(), 0);
+        dispatcher
+            .execute_envelope(env)
+            .expect("server-side permission lookup should allow review");
+
+        assert_eq!(state.call_count(), 2);
+        let first_call = state.call_at(0).expect("permission lookup should run first");
+        assert_eq!(first_call.1[0], "api");
+        assert!(first_call.1.iter().any(|arg| arg == "repos/octocat/hello"));
+
+        let second_call = state.call_at(1).expect("review command should run second");
+        assert_eq!(second_call.1[0], "pr");
+        assert!(second_call.1.iter().any(|arg| arg == "--approve"));
     }
 
     #[test]
@@ -2158,26 +2144,19 @@ mod tests {
     }
 
     #[test]
-    fn executes_internal_raw_command() {
-        let (runner, state) = RecordingRunner::new(vec![RawExecutionOutput {
-            exit_code: 0,
-            stdout: "{\"object\":{\"sha\":\"abc\"}}".into(),
-            stderr: String::new(),
-        }]);
+    fn rejects_commands_outside_the_stable_contract() {
+        let (runner, state) = RecordingRunner::new(vec![]);
         let dispatcher =
             FrontendDispatcher::new(runner, false).expect("dispatcher should initialize");
 
-        let value = dispatcher
+        let err = dispatcher
             .execute_envelope(envelope(
                 "repo.branch.ref.get",
                 json!({"args":["repos/octocat/hello/git/ref/heads/main"]}),
             ))
-            .expect("raw command should succeed");
+            .expect_err("unsupported contract command should fail");
 
-        assert_eq!(value["exit_code"], json!(0));
-        assert_eq!(value["stdout"], json!("{\"object\":{\"sha\":\"abc\"}}"));
-
-        let (_program, args) = state.last_call().expect("command should be called");
-        assert_eq!(args[0], "api");
+        assert_eq!(err.code, ErrorCode::ValidationError);
+        assert_eq!(state.call_count(), 0);
     }
 }

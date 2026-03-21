@@ -168,14 +168,22 @@ mod tests {
 
     #[test]
     fn execute_frontend_envelope_maps_permission_error() {
-        let dispatcher = FrontendDispatcher::new(RecordingRunner::new(vec![]), false)
-            .expect("dispatcher should initialize");
+        let dispatcher = FrontendDispatcher::new(
+            RecordingRunner::new(vec![RawExecutionOutput {
+                exit_code: 0,
+                stdout: r#"{"admin":false,"maintain":false,"push":false,"triage":false,"pull":true}"#
+                    .to_string(),
+                stderr: String::new(),
+            }]),
+            false,
+        )
+        .expect("dispatcher should initialize");
 
         let err = execute_frontend_envelope(
             &dispatcher,
             envelope(
-                "settings.collaborators.list",
-                serde_json::json!({"owner":"octocat","repo":"hello"}),
+                "pr.review",
+                serde_json::json!({"owner":"octocat","repo":"hello","number":1,"event":"approve"}),
             ),
         )
         .expect_err("must fail");

@@ -1,40 +1,70 @@
 import { createServer } from "node:http";
 import { existsSync } from "node:fs";
 import { spawn, spawnSync } from "node:child_process";
+import { timingSafeEqual } from "node:crypto";
 import { resolve } from "node:path";
 
 const port = Number(process.env.BRIDGE_PORT || 8787);
 const workspaceRoot = resolve(process.cwd(), "..");
 const manifestPath = resolve(workspaceRoot, "src-tauri", "Cargo.toml");
 const binaryPath = resolve(workspaceRoot, "target", "debug", "gh-client-envelope-cli");
+const bridgeToken = process.env.BRIDGE_TOKEN;
+const allowedOrigin = process.env.ALLOWED_ORIGIN || "http://127.0.0.1:4174";
+const MAX_BODY_BYTES = 64 * 1024;
+
+if (!bridgeToken) {
+  throw new Error("BRIDGE_TOKEN is required");
+}
 
 ensureBinary();
 
 const server = createServer(async (req, res) => {
+  const origin = req.headers.origin;
   const corsHeaders = {
-    "access-control-allow-origin": "*",
+    "access-control-allow-origin": allowedOrigin,
     "access-control-allow-methods": "POST, GET, OPTIONS",
-    "access-control-allow-headers": "content-type",
+    "access-control-allow-headers": "content-type, x-gh-client-bridge-token",
+    vary: "Origin",
   };
 
   if (!req.url) {
-    res.writeHead(400, corsHeaders).end();
+    res.writeHead(400).end();
     return;
   }
 
   if (req.method === "OPTIONS") {
+    if (!isAllowedOrigin(origin)) {
+      res.writeHead(403).end();
+      return;
+    }
+
     res.writeHead(204, corsHeaders).end();
     return;
   }
 
   if (req.method === "GET" && req.url === "/health") {
-    res.writeHead(200, { "content-type": "application/json", ...corsHeaders });
+    res.writeHead(200, { "content-type": "application/json" });
     res.end(JSON.stringify({ ok: true }));
     return;
   }
 
   if (req.method !== "POST" || req.url !== "/execute") {
-    res.writeHead(404, corsHeaders).end();
+    res.writeHead(404).end();
+    return;
+  }
+
+  if (!isAllowedOrigin(origin) || !hasValidBridgeToken(req.headers["x-gh-client-bridge-token"])) {
+    res.writeHead(403, { "content-type": "application/json" });
+    res.end(
+      JSON.stringify({
+        code: "permission_denied",
+        message: "bridge request rejected",
+        retryable: false,
+        fingerprint: "bridge-auth",
+        request_id: "",
+        command_id: "",
+      }),
+    );
     return;
   }
 
@@ -95,10 +125,34 @@ function ensureBinary() {
 function readBody(req) {
   return new Promise((resolveBody, rejectBody) => {
     const chunks = [];
-    req.on("data", (chunk) => chunks.push(Buffer.from(chunk)));
+    let totalBytes = 0;
+    req.on("data", (chunk) => {
+      totalBytes += chunk.length;
+      if (totalBytes > MAX_BODY_BYTES) {
+        rejectBody(new Error("request body too large"));
+        req.destroy();
+        return;
+      }
+
+      chunks.push(Buffer.from(chunk));
+    });
     req.on("end", () => resolveBody(Buffer.concat(chunks).toString("utf8")));
     req.on("error", rejectBody);
   });
+}
+
+function isAllowedOrigin(origin) {
+  return typeof origin === "string" && origin === allowedOrigin;
+}
+
+function hasValidBridgeToken(headerValue) {
+  if (typeof headerValue !== "string") {
+    return false;
+  }
+
+  const provided = Buffer.from(headerValue, "utf8");
+  const expected = Buffer.from(bridgeToken, "utf8");
+  return provided.length === expected.length && timingSafeEqual(provided, expected);
 }
 
 function executeEnvelope(envelope) {
