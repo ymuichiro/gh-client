@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { STABLE_COMMAND_IDS, type CommandId } from "./commandIds";
+import { ALL_COMMAND_IDS, STABLE_COMMAND_IDS, type CommandId } from "./commandIds";
 import type { CommandCategory, CommandField, CommandPermission, CommandSpec } from "./types";
 
 const ADMIN_COMMANDS = new Set<CommandId>([
@@ -852,7 +852,7 @@ function buildSpec(id: CommandId): CommandSpec {
   };
 }
 
-export const COMMAND_CATALOG: Record<CommandId, CommandSpec> = STABLE_COMMAND_IDS.reduce(
+export const COMMAND_CATALOG: Record<CommandId, CommandSpec> = ALL_COMMAND_IDS.reduce(
   (acc, id) => {
     acc[id] = buildSpec(id);
     return acc;

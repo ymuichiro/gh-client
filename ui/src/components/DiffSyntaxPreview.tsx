@@ -18,6 +18,9 @@ interface HighlightedDiffLine {
 }
 
 const MAX_HIGHLIGHT_LINES = 2500;
+const MAX_RENDER_LINES = 4000;
+const MAX_RENDER_CHARS = 200_000;
+const TRUNCATION_NOTICE = "... diff truncated for safety ...";
 
 const EXTENSION_LANGUAGE_MAP: Record<string, string> = {
   js: "javascript",
@@ -76,12 +79,13 @@ export function DiffSyntaxPreview({
   emptyLabel,
   viewMode,
 }: DiffSyntaxPreviewProps): JSX.Element {
+  const renderableContent = useMemo(() => normalizeRenderableContent(content), [content]);
   const highlightedLines = useMemo(
-    () => toHighlightedDiffLines(content, resolveLanguageFromFilename(filename)),
-    [content, filename],
+    () => toHighlightedDiffLines(renderableContent, resolveLanguageFromFilename(filename)),
+    [filename, renderableContent],
   );
 
-  if (content.trim().length === 0) {
+  if (renderableContent.trim().length === 0) {
     return <pre className="diff-preview">{emptyLabel}</pre>;
   }
 
@@ -112,6 +116,28 @@ function toHighlightedDiffLines(content: string, language: string | null): Highl
       html: html.length > 0 ? html : "&nbsp;",
     };
   });
+}
+
+function normalizeRenderableContent(content: string): string {
+  if (content.length === 0) {
+    return content;
+  }
+
+  let next = content;
+  let truncated = false;
+
+  if (next.length > MAX_RENDER_CHARS) {
+    next = next.slice(0, MAX_RENDER_CHARS);
+    truncated = true;
+  }
+
+  const lines = next.split("\n");
+  if (lines.length > MAX_RENDER_LINES) {
+    next = lines.slice(0, MAX_RENDER_LINES).join("\n");
+    truncated = true;
+  }
+
+  return truncated ? `${next}\n${TRUNCATION_NOTICE}` : next;
 }
 
 function renderInlineView(lines: HighlightedDiffLine[]): JSX.Element {

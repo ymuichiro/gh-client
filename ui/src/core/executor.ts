@@ -30,6 +30,7 @@ const executionMode = (import.meta.env.VITE_EXECUTION_MODE || "tauri") as
   | "mock"
   | "bridge";
 const bridgeUrl = import.meta.env.VITE_EXECUTION_BRIDGE_URL as string | undefined;
+const bridgeToken = import.meta.env.VITE_EXECUTION_BRIDGE_TOKEN as string | undefined;
 
 export async function executeCommand<T = unknown>(
   commandId: CommandId,
@@ -125,7 +126,10 @@ async function fetchBridge(url: string, envelope: CommandEnvelope): Promise<Resp
     try {
       return await fetch(url, {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: {
+          "content-type": "application/json",
+          ...(bridgeToken ? { "x-gh-client-bridge-token": bridgeToken } : {}),
+        },
         body: JSON.stringify(envelope),
       });
     } catch (error) {

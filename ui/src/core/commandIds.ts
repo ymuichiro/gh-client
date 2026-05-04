@@ -1,6 +1,6 @@
-export const CONTRACT_VERSION = "2026-03-09.v4";
+export const CONTRACT_VERSION = "2026-03-13.v5";
 
-export const STABLE_COMMAND_IDS = [
+export const ALL_COMMAND_IDS = [
   "discussions.answer",
   "discussions.categories.list",
   "discussions.close",
@@ -92,4 +92,26 @@ export const STABLE_COMMAND_IDS = [
   "workflow.list",
 ] as const;
 
-export type CommandId = (typeof STABLE_COMMAND_IDS)[number];
+export const STABLE_COMMAND_IDS = [
+  "auth.organizations.list",
+  "auth.status",
+  "issue.close",
+  "issue.comment",
+  "issue.edit",
+  "issue.list",
+  "issue.reopen",
+  "issue.view",
+  "pr.close",
+  "pr.comments.list",
+  "pr.diff.files.list",
+  "pr.diff.raw.get",
+  "pr.list",
+  "pr.merge",
+  "pr.reopen",
+  "pr.review",
+  "pr.review_threads.list",
+  "pr.view",
+  "repo.list",
+] as const;
+
+export type CommandId = (typeof ALL_COMMAND_IDS)[number];
